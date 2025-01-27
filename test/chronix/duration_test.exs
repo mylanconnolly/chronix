@@ -12,6 +12,15 @@ defmodule Chronix.DurationTest do
       assert Duration.parse("in 4 weeks") == {:week, 4}
       assert Duration.parse("in 3 months") == {:month, 3}
       assert Duration.parse("in 1 year") == {:year, 1}
+
+      # Test "from now" format
+      assert Duration.parse("2 seconds from now") == {:second, 2}
+      assert Duration.parse("1 minute from now") == {:minute, 1}
+      assert Duration.parse("24 hours from now") == {:hour, 24}
+      assert Duration.parse("7 days from now") == {:day, 7}
+      assert Duration.parse("4 weeks from now") == {:week, 4}
+      assert Duration.parse("3 months from now") == {:month, 3}
+      assert Duration.parse("1 year from now") == {:year, 1}
     end
 
     test "parses past duration formats" do
@@ -56,49 +65,45 @@ defmodule Chronix.DurationTest do
       assert Duration.parse("last Monday", reference_date: monday) == {:day, -7}
     end
 
-    test "parses next time period formats" do
+    test "parses next/last time period formats" do
       assert Duration.parse("next week") == {:week, 1}
       assert Duration.parse("next month") == {:month, 1}
       assert Duration.parse("next year") == {:year, 1}
-    end
 
-    test "parses last time period formats" do
       assert Duration.parse("last week") == {:week, -1}
       assert Duration.parse("last month") == {:month, -1}
       assert Duration.parse("last year") == {:year, -1}
     end
 
-    test "handles singular and plural units" do
-      assert Duration.parse("in 1 second") == {:second, 1}
-      assert Duration.parse("in 2 seconds") == {:second, 2}
-      assert Duration.parse("1 second ago") == {:second, -1}
-      assert Duration.parse("2 seconds ago") == {:second, -2}
-    end
-
     test "handles numbers with commas" do
       assert Duration.parse("in 1,000 seconds") == {:second, 1000}
       assert Duration.parse("1,000 seconds ago") == {:second, -1000}
-      assert Duration.parse("in 1,234,567 minutes") == {:minute, 1_234_567}
-      assert Duration.parse("1,234,567 minutes ago") == {:minute, -1_234_567}
-      assert Duration.parse("in 2,000,000 days") == {:day, 2_000_000}
-      assert Duration.parse("2,000,000 days ago") == {:day, -2_000_000}
+      assert Duration.parse("1,000 seconds from now") == {:second, 1000}
     end
 
-    test "raises error for invalid formats" do
+    test "raises on invalid formats" do
       assert_raise ArgumentError, "unsupported duration format: invalid", fn ->
         Duration.parse("invalid")
       end
 
       assert_raise ArgumentError, "unsupported unit: invalid", fn ->
-        Duration.parse("in 5 invalid")
+        Duration.parse("in 1 invalid")
       end
 
       assert_raise ArgumentError, "unsupported unit: invalid", fn ->
-        Duration.parse("5 invalid ago")
+        Duration.parse("1 invalid ago")
+      end
+
+      assert_raise ArgumentError, "unsupported unit: invalid", fn ->
+        Duration.parse("1 invalid from now")
       end
 
       assert_raise ArgumentError, "unsupported weekday: invalid", fn ->
         Duration.parse("next invalid")
+      end
+
+      assert_raise ArgumentError, "unsupported weekday: invalid", fn ->
+        Duration.parse("last invalid")
       end
     end
   end

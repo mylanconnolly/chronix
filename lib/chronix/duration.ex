@@ -18,6 +18,7 @@ defmodule Chronix.Duration do
 
   Currently supports the formats:
   - "in X units" - for future durations (e.g., "in 2 seconds")
+  - "X units from now" - alternative future format (e.g., "2 seconds from now")
   - "X units ago" - for past durations (e.g., "2 seconds ago")
   - "next <weekday>" - for next occurrence of weekday (e.g., "next monday")
   - "last <weekday>" - for previous occurrence of weekday (e.g., "last monday")
@@ -38,6 +39,9 @@ defmodule Chronix.Duration do
   ## Examples
 
       iex> Chronix.Duration.parse("in 2 seconds")
+      {:second, 2}
+
+      iex> Chronix.Duration.parse("2 seconds from now")
       {:second, 2}
 
       iex> Chronix.Duration.parse("in 5 months")
@@ -146,6 +150,26 @@ defmodule Chronix.Duration do
           |> String.replace(",", "")
           |> String.to_integer()
           |> Kernel.*(-1)
+
+        unit =
+          case String.downcase(unit) do
+            "second" <> _ -> :second
+            "minute" <> _ -> :minute
+            "hour" <> _ -> :hour
+            "day" <> _ -> :day
+            "week" <> _ -> :week
+            "month" <> _ -> :month
+            "year" <> _ -> :year
+            _ -> raise ArgumentError, "unsupported unit: #{unit}"
+          end
+
+        {unit, number}
+
+      [number_str, unit, "from", "now"] ->
+        number =
+          number_str
+          |> String.replace(",", "")
+          |> String.to_integer()
 
         unit =
           case String.downcase(unit) do
