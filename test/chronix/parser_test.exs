@@ -75,5 +75,31 @@ defmodule Chronix.ParserTest do
       assert Parser.parse("last sunday", reference_date: monday) ==
                DateTime.add(monday, -1 * 24 * 60 * 60, :second)
     end
+
+    test "parses mm/dd/yyyy format" do
+      {:ok, expected} = NaiveDateTime.new(2024, 12, 25, 0, 0, 0)
+      assert Parser.parse("12/25/2024") == {:ok, expected}
+
+      {:ok, expected} = NaiveDateTime.new(2025, 1, 1, 0, 0, 0)
+      assert Parser.parse("01/01/2025") == {:ok, expected}
+
+      # Invalid dates should return error
+      assert Parser.parse("13/01/2024") == {:error, "Invalid date format: 13/01/2024"}
+      assert Parser.parse("01/32/2024") == {:error, "Invalid date format: 01/32/2024"}
+      assert Parser.parse("02/30/2024") == {:error, "Invalid date format: 02/30/2024"}
+    end
+
+    test "parses yyyy-mm-dd format" do
+      {:ok, expected} = NaiveDateTime.new(2024, 12, 25, 0, 0, 0)
+      assert Parser.parse("2024-12-25") == {:ok, expected}
+
+      {:ok, expected} = NaiveDateTime.new(2025, 1, 1, 0, 0, 0)
+      assert Parser.parse("2025-01-01") == {:ok, expected}
+
+      # Invalid dates should return error
+      assert Parser.parse("2024-13-01") == {:error, "Invalid date format: 2024-13-01"}
+      assert Parser.parse("2024-01-32") == {:error, "Invalid date format: 2024-01-32"}
+      assert Parser.parse("2024-02-30") == {:error, "Invalid date format: 2024-02-30"}
+    end
   end
 end
