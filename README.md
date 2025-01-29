@@ -19,6 +19,13 @@ end
 Chronix provides a simple interface for parsing natural language date expressions. Here are some examples:
 
 ````elixir
+# Current dates (two equivalent formats)
+iex> Chronix.parse("today")
+~U[2025-01-27 11:59:03Z]
+
+iex> Chronix.parse("now")
+~U[2025-01-27 11:59:03Z]
+
 # Future dates (two equivalent formats)
 iex> Chronix.parse("in 2 minutes")
 ~U[2025-01-27 12:01:03Z]  # 2 minutes from now

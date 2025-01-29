@@ -4,6 +4,26 @@ defmodule Chronix.ParserTest do
   alias Chronix.Parser
 
   describe "parse/2" do
+    test "parses 'today' correctly" do
+      before = DateTime.utc_now()
+      result = Chronix.Parser.parse("today")
+      after_time = DateTime.utc_now()
+
+      # Check that the result is between before and after
+      assert DateTime.compare(before, result) in [:lt, :eq]
+      assert DateTime.compare(result, after_time) in [:lt, :eq]
+    end
+
+    test "parses 'now' correctly" do
+      before = DateTime.utc_now()
+      result = Chronix.Parser.parse("now")
+      after_time = DateTime.utc_now()
+
+      # Check that the result is between before and after
+      assert DateTime.compare(before, result) in [:lt, :eq]
+      assert DateTime.compare(result, after_time) in [:lt, :eq]
+    end
+
     test "parses future dates" do
       ref = ~U[2025-01-27 00:00:00Z]
 
@@ -162,38 +182,66 @@ defmodule Chronix.ParserTest do
 
     test "parses end of durations" do
       ref = ~U[2025-01-27 13:45:30.123456Z]
-      
+
       # Test end of second
       assert Parser.parse("end of 2 seconds from now", reference_date: ref) ==
                %{DateTime.add(ref, 2, :second) | microsecond: {999_999, 6}}
-               
+
       # Test end of minute
       assert Parser.parse("end of 3 minutes from now", reference_date: ref) ==
                %{DateTime.add(ref, 3 * 60, :second) | second: 59, microsecond: {999_999, 6}}
-               
+
       # Test end of hour
       assert Parser.parse("end of 4 hours from now", reference_date: ref) ==
-               %{DateTime.add(ref, 4 * 3600, :second) | minute: 59, second: 59, microsecond: {999_999, 6}}
-               
+               %{
+                 DateTime.add(ref, 4 * 3600, :second)
+                 | minute: 59,
+                   second: 59,
+                   microsecond: {999_999, 6}
+               }
+
       # Test end of day
       assert Parser.parse("end of 2 days from now", reference_date: ref) ==
-               %{DateTime.add(ref, 2 * 86400, :second) | hour: 23, minute: 59, second: 59, microsecond: {999_999, 6}}
-               
+               %{
+                 DateTime.add(ref, 2 * 86400, :second)
+                 | hour: 23,
+                   minute: 59,
+                   second: 59,
+                   microsecond: {999_999, 6}
+               }
+
       # Test end of week (should be Sunday)
       future = DateTime.add(ref, 2 * 7 * 86400, :second)
       sunday = future |> DateTime.add((7 - Date.day_of_week(future)) * 86400, :second)
+
       assert Parser.parse("end of 2 weeks from now", reference_date: ref) ==
                %{sunday | hour: 23, minute: 59, second: 59, microsecond: {999_999, 6}}
-               
+
       # Test end of month
       future_month = DateTime.add(ref, 3 * 30 * 86400, :second)
       days_in_month = Calendar.ISO.days_in_month(future_month.year, future_month.month)
+
       assert Parser.parse("end of 3 months from now", reference_date: ref) ==
-               %{future_month | day: days_in_month, hour: 23, minute: 59, second: 59, microsecond: {999_999, 6}}
-               
+               %{
+                 future_month
+                 | day: days_in_month,
+                   hour: 23,
+                   minute: 59,
+                   second: 59,
+                   microsecond: {999_999, 6}
+               }
+
       # Test end of year
       assert Parser.parse("end of 2 years from now", reference_date: ref) ==
-               %{DateTime.add(ref, 2 * 365 * 86400, :second) | month: 12, day: 31, hour: 23, minute: 59, second: 59, microsecond: {999_999, 6}}
+               %{
+                 DateTime.add(ref, 2 * 365 * 86400, :second)
+                 | month: 12,
+                   day: 31,
+                   hour: 23,
+                   minute: 59,
+                   second: 59,
+                   microsecond: {999_999, 6}
+               }
     end
   end
 end

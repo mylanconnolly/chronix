@@ -10,6 +10,14 @@ defmodule Chronix.Parser do
     parse_date(str, opts)
   end
 
+  defp parse_date("today", _opts) do
+    DateTime.utc_now()
+  end
+
+  defp parse_date("now", _opts) do
+    DateTime.utc_now()
+  end
+
   defp parse_date("beginning of " <> rest, opts) do
     ref = Keyword.get(opts, :reference_date, DateTime.utc_now())
     duration = Chronix.Duration.parse(rest, reference_date: ref)
@@ -61,7 +69,7 @@ defmodule Chronix.Parser do
 
       {:week, _} ->
         val
-        |> DateTime.add(((7 - Date.day_of_week(val)) * 24 * 60 * 60), :second)
+        |> DateTime.add((7 - Date.day_of_week(val)) * 24 * 60 * 60, :second)
         |> then(&%{&1 | hour: 23, minute: 59, second: 59, microsecond: {999_999, 6}})
 
       {:month, _} ->
