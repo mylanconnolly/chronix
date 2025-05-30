@@ -12,6 +12,13 @@ defmodule Chronix.DurationTest do
       assert Duration.parse("in 4 weeks") == {:week, 4}
       assert Duration.parse("in 3 months") == {:month, 3}
       assert Duration.parse("in 1 year") == {:year, 1}
+      assert Duration.parse("2 seconds") == {:second, 2}
+      assert Duration.parse("1 minute") == {:minute, 1}
+      assert Duration.parse("24 hours") == {:hour, 24}
+      assert Duration.parse("7 days") == {:day, 7}
+      assert Duration.parse("4 weeks") == {:week, 4}
+      assert Duration.parse("3 months") == {:month, 3}
+      assert Duration.parse("1 year") == {:year, 1}
 
       # Test "from now" format
       assert Duration.parse("2 seconds from now") == {:second, 2}
@@ -35,7 +42,8 @@ defmodule Chronix.DurationTest do
 
     test "parses next weekday formats" do
       # Monday is day 1, so from Monday to next Monday should be 7 days
-      monday = ~U[2025-01-27 00:00:00Z]  # This is a Monday
+      # This is a Monday
+      monday = ~U[2025-01-27 00:00:00Z]
       assert Duration.parse("next monday", reference_date: monday) == {:day, 7}
       assert Duration.parse("next tuesday", reference_date: monday) == {:day, 1}
       assert Duration.parse("next wednesday", reference_date: monday) == {:day, 2}
@@ -51,7 +59,8 @@ defmodule Chronix.DurationTest do
 
     test "parses last weekday formats" do
       # Monday is day 1, so from Monday to last Monday should be -7 days
-      monday = ~U[2025-01-27 00:00:00Z]  # This is a Monday
+      # This is a Monday
+      monday = ~U[2025-01-27 00:00:00Z]
       assert Duration.parse("last monday", reference_date: monday) == {:day, -7}
       assert Duration.parse("last tuesday", reference_date: monday) == {:day, -6}
       assert Duration.parse("last wednesday", reference_date: monday) == {:day, -5}

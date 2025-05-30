@@ -120,73 +120,50 @@ defmodule Chronix.Duration do
   end
 
   def parse("in " <> rest, _opts) do
-    [number_str, unit] = String.split(rest, " ", parts: 2)
-
-    number =
-      number_str
-      |> String.replace(",", "")
-      |> String.to_integer()
-
-    unit =
-      case String.downcase(unit) do
-        "second" <> _ -> :second
-        "minute" <> _ -> :minute
-        "hour" <> _ -> :hour
-        "day" <> _ -> :day
-        "week" <> _ -> :week
-        "month" <> _ -> :month
-        "year" <> _ -> :year
-        _ -> raise ArgumentError, "unsupported unit: #{unit}"
-      end
-
+    [number_str, unit_str] = String.split(rest, " ", parts: 2)
+    number = parse_number(number_str)
+    unit = parse_unit(unit_str)
     {unit, number}
   end
 
   def parse(str, _opts) do
     case String.split(str, " ") do
-      [number_str, unit, "ago"] ->
-        number =
-          number_str
-          |> String.replace(",", "")
-          |> String.to_integer()
-          |> Kernel.*(-1)
-
-        unit =
-          case String.downcase(unit) do
-            "second" <> _ -> :second
-            "minute" <> _ -> :minute
-            "hour" <> _ -> :hour
-            "day" <> _ -> :day
-            "week" <> _ -> :week
-            "month" <> _ -> :month
-            "year" <> _ -> :year
-            _ -> raise ArgumentError, "unsupported unit: #{unit}"
-          end
-
+      [number_str, unit_str, "ago"] ->
+        number = parse_number(number_str) * -1
+        unit = parse_unit(unit_str)
         {unit, number}
 
-      [number_str, unit, "from", "now"] ->
-        number =
-          number_str
-          |> String.replace(",", "")
-          |> String.to_integer()
+      [number_str, unit_str, "from", "now"] ->
+        number = parse_number(number_str)
+        unit = parse_unit(unit_str)
+        {unit, number}
 
-        unit =
-          case String.downcase(unit) do
-            "second" <> _ -> :second
-            "minute" <> _ -> :minute
-            "hour" <> _ -> :hour
-            "day" <> _ -> :day
-            "week" <> _ -> :week
-            "month" <> _ -> :month
-            "year" <> _ -> :year
-            _ -> raise ArgumentError, "unsupported unit: #{unit}"
-          end
-
+      [number_str, unit_str] ->
+        number = parse_number(number_str)
+        unit = parse_unit(unit_str)
         {unit, number}
 
       _ ->
         raise ArgumentError, "unsupported duration format: #{str}"
+    end
+  end
+
+  defp parse_number(str) do
+    str
+    |> String.replace(",", "")
+    |> String.to_integer()
+  end
+
+  defp parse_unit(str) do
+    case String.downcase(str) do
+      "second" <> _ -> :second
+      "minute" <> _ -> :minute
+      "hour" <> _ -> :hour
+      "day" <> _ -> :day
+      "week" <> _ -> :week
+      "month" <> _ -> :month
+      "year" <> _ -> :year
+      _ -> raise ArgumentError, "unsupported unit: #{str}"
     end
   end
 end
