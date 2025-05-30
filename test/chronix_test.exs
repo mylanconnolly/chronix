@@ -5,8 +5,21 @@ defmodule ChronixTest do
     test "identifies simple time expressions" do
       assert Chronix.expression?("now")
       assert Chronix.expression?("today")
-      assert Chronix.expression?("NOW") # case insensitive
-      assert Chronix.expression?("TODAY") # case insensitive
+      # case insensitive
+      assert Chronix.expression?("NOW")
+      # case insensitive
+      assert Chronix.expression?("TODAY")
+    end
+
+    test "identifies 'X time' expressions" do
+      assert Chronix.expression?("5 seconds")
+      assert Chronix.expression?("10 minutes")
+      assert Chronix.expression?("2 hours")
+      assert Chronix.expression?("3 days")
+      assert Chronix.expression?("4 weeks")
+      assert Chronix.expression?("6 months")
+      assert Chronix.expression?("1 year")
+      assert Chronix.expression?("100 years")
     end
 
     test "identifies 'in X time' expressions" do
@@ -57,7 +70,7 @@ defmodule ChronixTest do
       assert Chronix.expression?("next friday")
       assert Chronix.expression?("next saturday")
       assert Chronix.expression?("next sunday")
-      
+
       assert Chronix.expression?("last monday")
       assert Chronix.expression?("last tuesday")
       assert Chronix.expression?("last wednesday")
@@ -95,11 +108,8 @@ defmodule ChronixTest do
       refute Chronix.expression?("yesterday")
       refute Chronix.expression?("next")
       refute Chronix.expression?("last")
-      refute Chronix.expression?("5 days")
       refute Chronix.expression?("in days")
       refute Chronix.expression?("in 5")
-      # "from now" actually matches the regex due to alternation patterns
-      assert Chronix.expression?("from now")
       refute Chronix.expression?("ago")
       refute Chronix.expression?("beginning")
       refute Chronix.expression?("beginning of")
