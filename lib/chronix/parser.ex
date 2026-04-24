@@ -36,6 +36,8 @@ defmodule Chronix.Parser do
   defp do_parse("", _opts), do: {:error, "empty expression"}
   defp do_parse("today", opts), do: {:ok, ref(opts)}
   defp do_parse("now", opts), do: {:ok, ref(opts)}
+  defp do_parse("tomorrow", opts), do: {:ok, DateTime.shift(ref(opts), [{:day, 1}])}
+  defp do_parse("yesterday", opts), do: {:ok, DateTime.shift(ref(opts), [{:day, -1}])}
 
   defp do_parse("beginning of " <> rest, opts) do
     with {:ok, duration} <- Duration.parse(rest, opts) do

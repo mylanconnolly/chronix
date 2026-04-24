@@ -14,6 +14,32 @@ defmodule Chronix.ParserTest do
       assert Parser.parse_expression("now", reference_date: ref) == {:ok, ref}
     end
 
+    test "parses 'tomorrow' as 1 day after the reference" do
+      ref = ~U[2025-01-27 12:00:00Z]
+
+      assert Parser.parse_expression("tomorrow", reference_date: ref) ==
+               {:ok, ~U[2025-01-28 12:00:00Z]}
+    end
+
+    test "parses 'yesterday' as 1 day before the reference" do
+      ref = ~U[2025-01-27 12:00:00Z]
+
+      assert Parser.parse_expression("yesterday", reference_date: ref) ==
+               {:ok, ~U[2025-01-26 12:00:00Z]}
+    end
+
+    test "tomorrow/yesterday honor month and year boundaries" do
+      ref = ~U[2025-01-31 09:00:00Z]
+
+      assert Parser.parse_expression("tomorrow", reference_date: ref) ==
+               {:ok, ~U[2025-02-01 09:00:00Z]}
+
+      ref = ~U[2025-01-01 09:00:00Z]
+
+      assert Parser.parse_expression("yesterday", reference_date: ref) ==
+               {:ok, ~U[2024-12-31 09:00:00Z]}
+    end
+
     test "falls back to current time when no reference_date is given" do
       before = DateTime.utc_now()
       {:ok, result} = Parser.parse_expression("now")

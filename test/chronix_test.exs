@@ -10,7 +10,7 @@ defmodule ChronixTest do
     end
 
     test "returns {:error, reason} on failure" do
-      assert {:error, _} = Chronix.parse("tomorrow")
+      assert {:error, _} = Chronix.parse("not a date")
       assert {:error, _} = Chronix.parse("")
       assert {:error, _} = Chronix.parse("in 2 seconds ago")
     end
@@ -29,7 +29,7 @@ defmodule ChronixTest do
     end
 
     test "raises ArgumentError on failure" do
-      assert_raise ArgumentError, fn -> Chronix.parse!("tomorrow") end
+      assert_raise ArgumentError, fn -> Chronix.parse!("not a date") end
       assert_raise ArgumentError, fn -> Chronix.parse!("in 2 seconds ago") end
     end
   end
@@ -120,9 +120,14 @@ defmodule ChronixTest do
       assert Chronix.expression?("01/01/2023")
     end
 
+    test "identifies tomorrow and yesterday" do
+      assert Chronix.expression?("tomorrow")
+      assert Chronix.expression?("yesterday")
+      assert Chronix.expression?("TOMORROW")
+      assert Chronix.expression?("  yesterday  ")
+    end
+
     test "rejects invalid expressions" do
-      refute Chronix.expression?("tomorrow")
-      refute Chronix.expression?("yesterday")
       refute Chronix.expression?("next")
       refute Chronix.expression?("last")
       refute Chronix.expression?("in days")
