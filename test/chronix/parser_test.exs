@@ -478,7 +478,12 @@ defmodule Chronix.ParserTest do
 
       assert Parser.parse_expression("beginning of 4 hours from now", reference_date: ref) ==
                {:ok,
-                %{DateTime.add(ref, 4 * 3600, :second) | minute: 0, second: 0, microsecond: {0, 6}}}
+                %{
+                  DateTime.add(ref, 4 * 3600, :second)
+                  | minute: 0,
+                    second: 0,
+                    microsecond: {0, 6}
+                }}
 
       assert Parser.parse_expression("beginning of 2 days from now", reference_date: ref) ==
                {:ok,
@@ -499,8 +504,7 @@ defmodule Chronix.ParserTest do
       future_month = DateTime.shift(ref, [{:month, 3}])
 
       assert Parser.parse_expression("beginning of 3 months from now", reference_date: ref) ==
-               {:ok,
-                %{future_month | day: 1, hour: 0, minute: 0, second: 0, microsecond: {0, 6}}}
+               {:ok, %{future_month | day: 1, hour: 0, minute: 0, second: 0, microsecond: {0, 6}}}
 
       future_year = DateTime.shift(ref, [{:year, 2}])
 
@@ -550,8 +554,7 @@ defmodule Chronix.ParserTest do
       sunday = DateTime.add(future, (7 - Date.day_of_week(future)) * 86400, :second)
 
       assert Parser.parse_expression("end of 2 weeks from now", reference_date: ref) ==
-               {:ok,
-                %{sunday | hour: 23, minute: 59, second: 59, microsecond: {999_999, 6}}}
+               {:ok, %{sunday | hour: 23, minute: 59, second: 59, microsecond: {999_999, 6}}}
 
       future_month = DateTime.shift(ref, [{:month, 3}])
       days_in_month = Calendar.ISO.days_in_month(future_month.year, future_month.month)

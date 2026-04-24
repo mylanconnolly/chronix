@@ -591,9 +591,9 @@ defmodule Chronix.Grammar do
     |> eos()
 
   # ── Public parsers ────────────────────────────────────────────────────
-  defparsec :time, time_combinator |> eos()
-  defparsec :duration, duration_combinator |> eos()
-  defparsec :expression, expression
+  defparsec(:time, time_combinator |> eos())
+  defparsec(:duration, duration_combinator |> eos())
+  defparsec(:expression, expression)
 
   # ── Post-traverse helpers ─────────────────────────────────────────────
   @doc false
