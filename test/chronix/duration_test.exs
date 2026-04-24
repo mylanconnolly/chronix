@@ -84,6 +84,21 @@ defmodule Chronix.DurationTest do
       assert Duration.parse("1,000 seconds from now") == {:ok, {:second, 1000}}
     end
 
+    test "treats 'a' and 'an' as 1" do
+      assert Duration.parse("in a week") == {:ok, {:week, 1}}
+      assert Duration.parse("in an hour") == {:ok, {:hour, 1}}
+      assert Duration.parse("a year from now") == {:ok, {:year, 1}}
+      assert Duration.parse("an hour from now") == {:ok, {:hour, 1}}
+      assert Duration.parse("a minute ago") == {:ok, {:minute, -1}}
+      assert Duration.parse("an hour ago") == {:ok, {:hour, -1}}
+      assert Duration.parse("a day") == {:ok, {:day, 1}}
+      assert Duration.parse("an hour") == {:ok, {:hour, 1}}
+
+      # 'a'/'an' are interchangeable — we don't enforce grammar
+      assert Duration.parse("a hour ago") == {:ok, {:hour, -1}}
+      assert Duration.parse("an week from now") == {:ok, {:week, 1}}
+    end
+
     test "returns errors for invalid formats" do
       assert Duration.parse("invalid") == {:error, "unsupported duration format: invalid"}
       assert Duration.parse("in 1 invalid") == {:error, "unsupported unit: invalid"}

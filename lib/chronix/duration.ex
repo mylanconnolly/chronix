@@ -133,6 +133,9 @@ defmodule Chronix.Duration do
     end
   end
 
+  defp parse_number("a"), do: {:ok, 1}
+  defp parse_number("an"), do: {:ok, 1}
+
   defp parse_number(str) do
     cleaned = String.replace(str, ",", "")
 

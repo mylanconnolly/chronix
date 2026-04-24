@@ -75,6 +75,19 @@ defmodule Chronix.ParserTest do
                {:ok, DateTime.add(ref, -24 * 60 * 60, :second)}
     end
 
+    test "parses 'a' / 'an' as a count of 1" do
+      ref = ~U[2025-01-27 00:00:00Z]
+
+      assert Parser.parse_expression("in a week", reference_date: ref) ==
+               {:ok, DateTime.shift(ref, [{:week, 1}])}
+
+      assert Parser.parse_expression("an hour ago", reference_date: ref) ==
+               {:ok, DateTime.add(ref, -3600, :second)}
+
+      assert Parser.parse_expression("a year from now", reference_date: ref) ==
+               {:ok, DateTime.shift(ref, [{:year, 1}])}
+    end
+
     test "rejects 'in X Y ago'" do
       ref = ~U[2025-01-27 00:00:00Z]
 
