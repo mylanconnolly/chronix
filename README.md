@@ -16,86 +16,112 @@ end
 
 ## Usage
 
-Chronix provides a simple interface for parsing natural language date expressions. Here are some examples:
+The main entry points are `Chronix.parse/2`, `Chronix.parse!/2`, and `Chronix.expression?/1`. All three share the same definition of "a valid Chronix expression."
 
-````elixir
+- `parse/2` returns `{:ok, %DateTime{}}` on success or `{:error, reason}` on failure. It never raises.
+- `parse!/2` returns the `DateTime` directly and raises `ArgumentError` on failure.
+- `expression?/1` returns `true` if and only if `parse/2` would succeed on the same input.
+
+```elixir
 # Current dates (two equivalent formats)
 iex> Chronix.parse("today")
-~U[2025-01-27 11:59:03Z]
+{:ok, ~U[2025-01-27 11:59:03Z]}
 
 iex> Chronix.parse("now")
-~U[2025-01-27 11:59:03Z]
+{:ok, ~U[2025-01-27 11:59:03Z]}
 
 # Future dates (two equivalent formats)
 iex> Chronix.parse("in 2 minutes")
-~U[2025-01-27 12:01:03Z]  # 2 minutes from now
+{:ok, ~U[2025-01-27 12:01:03Z]}  # 2 minutes from now
 
 iex> Chronix.parse("2 minutes from now")
-~U[2025-01-27 12:01:03Z]  # same as above
+{:ok, ~U[2025-01-27 12:01:03Z]}  # same as above
 
 iex> Chronix.parse("in 3 days")
-~U[2025-01-30 11:59:03Z]  # 3 days from now
+{:ok, ~U[2025-01-30 11:59:03Z]}  # 3 days from now
 
 # Past dates
 iex> Chronix.parse("2 hours ago")
-~U[2025-01-27 09:59:03Z]  # 2 hours before now
+{:ok, ~U[2025-01-27 09:59:03Z]}  # 2 hours before now
 
 # Weekday-based parsing
 iex> Chronix.parse("next monday")
-~U[2025-02-03 11:59:03Z]  # Next Monday
+{:ok, ~U[2025-02-03 11:59:03Z]}  # Next Monday
 
 iex> Chronix.parse("last friday")
-~U[2025-01-24 11:59:03Z]  # Previous Friday
+{:ok, ~U[2025-01-24 11:59:03Z]}  # Previous Friday
 
-# Using a reference date
+# Using a reference date (applies to ALL relative expressions, including "today" / "now")
 iex> reference = ~U[2025-01-27 00:00:00Z]
 iex> Chronix.parse("in 1 day", reference_date: reference)
+{:ok, ~U[2025-01-28 00:00:00Z]}
+iex> Chronix.parse("today", reference_date: reference)
+{:ok, ~U[2025-01-27 00:00:00Z]}
+
+# Raising variant
+iex> Chronix.parse!("in 1 day", reference_date: reference)
 ~U[2025-01-28 00:00:00Z]
 
-# Beginning and End of Durations
+# Validity check
+iex> Chronix.expression?("in 3 days")
+true
+iex> Chronix.expression?("tomorrow")
+false
+```
+
+## Beginning and End of Durations
 
 Chronix can parse expressions that refer to the beginning or end of a duration:
 
 ```elixir
 # Beginning of durations
 iex> Chronix.parse("beginning of 2 days from now")
-~U[2025-01-29 00:00:00.000000Z]  # Start of the day, 2 days from now
+{:ok, ~U[2025-01-29 00:00:00.000000Z]}  # Start of the day, 2 days from now
 
 iex> Chronix.parse("beginning of 1 week from now")
-~U[2025-02-03 00:00:00.000000Z]  # Monday 00:00:00, start of next week
+{:ok, ~U[2025-02-03 00:00:00.000000Z]}  # Monday 00:00:00, start of next week
 
 iex> Chronix.parse("beginning of 2 months from now")
-~U[2025-03-01 00:00:00.000000Z]  # First day of the month, 2 months ahead
+{:ok, ~U[2025-03-01 00:00:00.000000Z]}  # First day of the month, 2 months ahead
 
 # End of durations
 iex> Chronix.parse("end of 2 days from now")
-~U[2025-01-29 23:59:59.999999Z]  # Last microsecond of the day
+{:ok, ~U[2025-01-29 23:59:59.999999Z]}  # Last microsecond of the day
 
 iex> Chronix.parse("end of 1 week from now")
-~U[2025-02-09 23:59:59.999999Z]  # Sunday 23:59:59, end of next week
+{:ok, ~U[2025-02-09 23:59:59.999999Z]}  # Sunday 23:59:59, end of next week
 
 iex> Chronix.parse("end of 1 month from now")
-~U[2025-02-28 23:59:59.999999Z]  # Last microsecond of the last day of next month
+{:ok, ~U[2025-02-28 23:59:59.999999Z]}  # Last microsecond of the last day of next month
 
 # With reference date
 iex> reference = ~U[2025-01-01 12:30:45Z]
 iex> Chronix.parse("beginning of 1 year from now", reference_date: reference)
-~U[2026-01-01 00:00:00.000000Z]  # Start of next year
+{:ok, ~U[2026-01-01 00:00:00.000000Z]}  # Start of next year
 iex> Chronix.parse("end of 1 year from now", reference_date: reference)
-~U[2026-12-31 23:59:59.999999Z]  # End of next year
-````
+{:ok, ~U[2026-12-31 23:59:59.999999Z]}  # End of next year
+```
 
-Chronix supports various natural language formats:
+## Supported formats
 
-- Future expressions: "in X minutes/hours/days/weeks/months/years" or "X minutes/hours/days/weeks/months/years from now"
-- Past expressions: "X minutes/hours/days/weeks/months/years ago"
-- Weekday expressions: "next monday", "last friday"
-- Beginning and End of Durations: "beginning of X days/weeks/months/years from now", "end of X days/weeks/months/years from now"
+- Future: `"in X <unit>s"` or `"X <unit>s from now"`
+- Past: `"X <unit>s ago"`
+- Bare: `"X <unit>s"` (treated as future from the reference date)
+- Weekday: `"next monday"`, `"last friday"`, etc.
+- Period: `"next week" | "next month" | "next year"` (and `"last ..."`)
+- Boundaries: `"beginning of ..."`, `"end of ..."` applied to any of the above
+- Explicit dates: `mm/dd/yyyy` and `yyyy-mm-dd` (midnight UTC)
 
-These expressions are particularly useful when you need to:
+Supported units: `second`, `minute`, `hour`, `day`, `week`, `month`, `year` (each also accepts the plural).
 
-- Get the start of a day/week/month/year for reporting periods
-- Find the last moment of a time period for deadlines
-- Work with precise time boundaries for scheduling
+Numbers may include commas for readability (`"in 1,000 seconds"`).
 
-All parsing is case-insensitive and whitespace-tolerant.
+Parsing is case-insensitive and whitespace-tolerant. Contradictory phrases like `"in 2 seconds ago"` are rejected with `{:error, _}` rather than silently normalized.
+
+## Reference date
+
+All relative expressions — including `"today"` and `"now"` — are resolved against the `:reference_date` option. If omitted, Chronix uses `DateTime.utc_now/0`. Pinning the reference date is the right way to make tests deterministic:
+
+```elixir
+Chronix.parse("next monday", reference_date: ~U[2025-01-27 00:00:00Z])
+```

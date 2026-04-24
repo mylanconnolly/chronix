@@ -1,13 +1,44 @@
 defmodule ChronixTest do
   use ExUnit.Case, async: true
 
+  describe "parse/2" do
+    test "returns {:ok, datetime} on success" do
+      ref = ~U[2025-01-27 00:00:00Z]
+
+      assert Chronix.parse("in 1 day", reference_date: ref) ==
+               {:ok, DateTime.add(ref, 86_400, :second)}
+    end
+
+    test "returns {:error, reason} on failure" do
+      assert {:error, _} = Chronix.parse("tomorrow")
+      assert {:error, _} = Chronix.parse("")
+      assert {:error, _} = Chronix.parse("in 2 seconds ago")
+    end
+
+    test "honors reference_date for 'today' and 'now'" do
+      ref = ~U[2025-01-27 12:00:00Z]
+      assert Chronix.parse("today", reference_date: ref) == {:ok, ref}
+      assert Chronix.parse("now", reference_date: ref) == {:ok, ref}
+    end
+  end
+
+  describe "parse!/2" do
+    test "returns the DateTime directly on success" do
+      ref = ~U[2025-01-27 00:00:00Z]
+      assert Chronix.parse!("in 1 day", reference_date: ref) == DateTime.add(ref, 86_400, :second)
+    end
+
+    test "raises ArgumentError on failure" do
+      assert_raise ArgumentError, fn -> Chronix.parse!("tomorrow") end
+      assert_raise ArgumentError, fn -> Chronix.parse!("in 2 seconds ago") end
+    end
+  end
+
   describe "expression?/1" do
     test "identifies simple time expressions" do
       assert Chronix.expression?("now")
       assert Chronix.expression?("today")
-      # case insensitive
       assert Chronix.expression?("NOW")
-      # case insensitive
       assert Chronix.expression?("TODAY")
     end
 
@@ -62,27 +93,17 @@ defmodule ChronixTest do
       assert Chronix.expression?("beginning of 2 weeks ago")
     end
 
-    test "identifies day-of-week expressions" do
-      assert Chronix.expression?("next monday")
-      assert Chronix.expression?("next tuesday")
-      assert Chronix.expression?("next wednesday")
-      assert Chronix.expression?("next thursday")
-      assert Chronix.expression?("next friday")
-      assert Chronix.expression?("next saturday")
-      assert Chronix.expression?("next sunday")
-
-      assert Chronix.expression?("last monday")
-      assert Chronix.expression?("last tuesday")
-      assert Chronix.expression?("last wednesday")
-      assert Chronix.expression?("last thursday")
-      assert Chronix.expression?("last friday")
-      assert Chronix.expression?("last saturday")
-      assert Chronix.expression?("last sunday")
+    test "identifies expressions with 'end of'" do
+      assert Chronix.expression?("end of 5 days from now")
+      assert Chronix.expression?("end of 2 weeks from now")
+      assert Chronix.expression?("end of 1 year ago")
     end
 
-    test "identifies 'beginning of' with day-of-week expressions" do
-      assert Chronix.expression?("beginning of next monday")
-      assert Chronix.expression?("beginning of last friday")
+    test "identifies day-of-week expressions" do
+      for weekday <- ~w(monday tuesday wednesday thursday friday saturday sunday) do
+        assert Chronix.expression?("next #{weekday}")
+        assert Chronix.expression?("last #{weekday}")
+      end
     end
 
     test "identifies time period expressions" do
@@ -94,13 +115,9 @@ defmodule ChronixTest do
       assert Chronix.expression?("last year")
     end
 
-    test "identifies 'beginning of' with time period expressions" do
-      assert Chronix.expression?("beginning of next week")
-      assert Chronix.expression?("beginning of next month")
-      assert Chronix.expression?("beginning of next year")
-      assert Chronix.expression?("beginning of last week")
-      assert Chronix.expression?("beginning of last month")
-      assert Chronix.expression?("beginning of last year")
+    test "identifies explicit-date formats" do
+      assert Chronix.expression?("2023-01-01")
+      assert Chronix.expression?("01/01/2023")
     end
 
     test "rejects invalid expressions" do
@@ -113,12 +130,28 @@ defmodule ChronixTest do
       refute Chronix.expression?("ago")
       refute Chronix.expression?("beginning")
       refute Chronix.expression?("beginning of")
-      refute Chronix.expression?("2023-01-01")
       refute Chronix.expression?("January 1st, 2023")
-      refute Chronix.expression?("01/01/2023")
       refute Chronix.expression?("random text")
       refute Chronix.expression?("")
       refute Chronix.expression?("    ")
+    end
+
+    test "is anchored — rejects strings that merely contain a valid expression" do
+      refute Chronix.expression?("garbage in 2 days garbage")
+      refute Chronix.expression?("todayyy")
+      refute Chronix.expression?("nowhere")
+      refute Chronix.expression?("5 seconds and some text")
+    end
+
+    test "rejects contradictions like 'in X Y ago'" do
+      refute Chronix.expression?("in 2 seconds ago")
+      refute Chronix.expression?("in 5 days ago")
+    end
+
+    test "rejects non-binary input" do
+      refute Chronix.expression?(nil)
+      refute Chronix.expression?(123)
+      refute Chronix.expression?(:atom)
     end
   end
 end

@@ -1,6 +1,7 @@
 defmodule Chronix.Duration do
   @moduledoc """
-  Handles parsing of duration strings into structured data.
+  Parses duration expressions into `{unit, n}` tuples suitable for
+  `DateTime.shift/2`.
   """
 
   @weekdays %{
@@ -13,157 +14,152 @@ defmodule Chronix.Duration do
     "sunday" => 7
   }
 
+  @units %{
+    "second" => :second,
+    "seconds" => :second,
+    "minute" => :minute,
+    "minutes" => :minute,
+    "hour" => :hour,
+    "hours" => :hour,
+    "day" => :day,
+    "days" => :day,
+    "week" => :week,
+    "weeks" => :week,
+    "month" => :month,
+    "months" => :month,
+    "year" => :year,
+    "years" => :year
+  }
+
+  @type unit :: :second | :minute | :hour | :day | :week | :month | :year
+  @type duration :: {unit, integer}
+  @type result :: {:ok, duration} | {:error, String.t()}
+
   @doc """
-  Parses a duration string into a tuple of {unit, value}.
+  Parses a duration string and returns `{:ok, {unit, n}}` or `{:error, reason}`.
 
-  Currently supports the formats:
-  - "in X units" - for future durations (e.g., "in 2 seconds")
-  - "X units from now" - alternative future format (e.g., "2 seconds from now")
-  - "X units ago" - for past durations (e.g., "2 seconds ago")
-  - "next <weekday>" - for next occurrence of weekday (e.g., "next monday")
-  - "last <weekday>" - for previous occurrence of weekday (e.g., "last monday")
-  - "next week/month/year" - for next time period
-  - "last week/month/year" - for previous time period
+  Supported formats:
 
-  where units can be:
-  - seconds
-  - minutes
-  - hours
-  - days
-  - weeks
-  - months
-  - years
+  - `"in X units"` — future (e.g. `"in 2 seconds"`)
+  - `"X units from now"` — future
+  - `"X units ago"` — past
+  - `"X units"` — future (bare form)
+  - `"next monday"` / `"last friday"` — resolved to a `{:day, n}` shift
+  - `"next week"` / `"last month"` / `"next year"` etc.
 
-  Numbers can include commas for readability (e.g., "1,000 seconds ago").
+  Units accept singular or plural forms exactly (`second`/`seconds`, etc.).
+  Numbers may include commas (`"1,000 seconds"`).
+
+  Weekday expressions are resolved against `:reference_date`, which
+  defaults to `DateTime.utc_now/0`.
 
   ## Examples
 
       iex> Chronix.Duration.parse("in 2 seconds")
-      {:second, 2}
-
-      iex> Chronix.Duration.parse("2 seconds from now")
-      {:second, 2}
-
-      iex> Chronix.Duration.parse("in 5 months")
-      {:month, 5}
+      {:ok, {:second, 2}}
 
       iex> Chronix.Duration.parse("2 seconds ago")
-      {:second, -2}
+      {:ok, {:second, -2}}
 
-      iex> Chronix.Duration.parse("5 months ago")
-      {:month, -5}
+      iex> Chronix.Duration.parse("5 months from now")
+      {:ok, {:month, 5}}
 
       iex> Chronix.Duration.parse("next monday", reference_date: ~U[2025-01-27 00:00:00Z])
-      {:day, 7}
+      {:ok, {:day, 7}}
 
-      iex> Chronix.Duration.parse("last monday", reference_date: ~U[2025-01-27 00:00:00Z])
-      {:day, -7}
-
-      iex> Chronix.Duration.parse("next week")
-      {:week, 1}
-
-      iex> Chronix.Duration.parse("last month")
-      {:month, -1}
+      iex> Chronix.Duration.parse("in 2 seconds ago")
+      {:error, "cannot combine 'in' and 'ago'"}
   """
-  def parse(str, opts \\ [])
-
-  def parse("next " <> period, _opts) when period in ["week", "month", "year"] do
-    unit = String.to_atom(period)
-    {unit, 1}
+  @spec parse(String.t(), keyword) :: result
+  def parse(str, opts \\ []) when is_binary(str) do
+    str
+    |> String.downcase()
+    |> String.trim()
+    |> do_parse(opts)
   end
 
-  def parse("last " <> period, _opts) when period in ["week", "month", "year"] do
-    unit = String.to_atom(period)
-    {unit, -1}
-  end
+  defp do_parse("next week", _opts), do: {:ok, {:week, 1}}
+  defp do_parse("next month", _opts), do: {:ok, {:month, 1}}
+  defp do_parse("next year", _opts), do: {:ok, {:year, 1}}
+  defp do_parse("last week", _opts), do: {:ok, {:week, -1}}
+  defp do_parse("last month", _opts), do: {:ok, {:month, -1}}
+  defp do_parse("last year", _opts), do: {:ok, {:year, -1}}
 
-  def parse("last " <> weekday, opts) do
-    ref_date = Keyword.get(opts, :reference_date, DateTime.utc_now())
-    weekday = String.downcase(weekday)
-
-    unless Map.has_key?(@weekdays, weekday) do
-      raise ArgumentError, "unsupported weekday: #{weekday}"
+  defp do_parse("next " <> weekday, opts) do
+    with {:ok, target} <- lookup_weekday(weekday) do
+      current = current_weekday(opts)
+      days = if target <= current, do: 7 - current + target, else: target - current
+      {:ok, {:day, days}}
     end
-
-    target_day = @weekdays[weekday]
-    current_day = Date.day_of_week(DateTime.to_date(ref_date))
-
-    days_ago =
-      if target_day >= current_day do
-        -(7 - (target_day - current_day))
-      else
-        -(current_day - target_day)
-      end
-
-    {:day, days_ago}
   end
 
-  def parse("next " <> weekday, opts) do
-    ref_date = Keyword.get(opts, :reference_date, DateTime.utc_now())
-    weekday = String.downcase(weekday)
-
-    unless Map.has_key?(@weekdays, weekday) do
-      raise ArgumentError, "unsupported weekday: #{weekday}"
+  defp do_parse("last " <> weekday, opts) do
+    with {:ok, target} <- lookup_weekday(weekday) do
+      current = current_weekday(opts)
+      days = if target >= current, do: -(7 - (target - current)), else: -(current - target)
+      {:ok, {:day, days}}
     end
-
-    target_day = @weekdays[weekday]
-    current_day = Date.day_of_week(DateTime.to_date(ref_date))
-
-    days_until =
-      if target_day <= current_day do
-        7 - current_day + target_day
-      else
-        target_day - current_day
-      end
-
-    {:day, days_until}
   end
 
-  def parse("in " <> rest, _opts) do
-    [number_str, unit_str] = String.split(rest, " ", parts: 2)
-    number = parse_number(number_str)
-    unit = parse_unit(unit_str)
-    {unit, number}
-  end
+  defp do_parse("in " <> rest, _opts) do
+    case String.split(rest, " ") do
+      [_num, _unit, "ago"] ->
+        {:error, "cannot combine 'in' and 'ago'"}
 
-  def parse(str, _opts) do
-    case String.split(str, " ") do
-      [number_str, unit_str, "ago"] ->
-        number = parse_number(number_str) * -1
-        unit = parse_unit(unit_str)
-        {unit, number}
+      [num, unit, "from", "now"] ->
+        build(num, unit, 1)
 
-      [number_str, unit_str, "from", "now"] ->
-        number = parse_number(number_str)
-        unit = parse_unit(unit_str)
-        {unit, number}
-
-      [number_str, unit_str] ->
-        number = parse_number(number_str)
-        unit = parse_unit(unit_str)
-        {unit, number}
+      [num, unit] ->
+        build(num, unit, 1)
 
       _ ->
-        raise ArgumentError, "unsupported duration format: #{str}"
+        {:error, "unsupported duration format: in #{rest}"}
+    end
+  end
+
+  defp do_parse(str, _opts) do
+    case String.split(str, " ") do
+      [num, unit, "ago"] -> build(num, unit, -1)
+      [num, unit, "from", "now"] -> build(num, unit, 1)
+      [num, unit] -> build(num, unit, 1)
+      _ -> {:error, "unsupported duration format: #{str}"}
+    end
+  end
+
+  defp build(num_str, unit_str, sign) do
+    with {:ok, n} <- parse_number(num_str),
+         {:ok, u} <- parse_unit(unit_str) do
+      {:ok, {u, n * sign}}
     end
   end
 
   defp parse_number(str) do
-    str
-    |> String.replace(",", "")
-    |> String.to_integer()
+    cleaned = String.replace(str, ",", "")
+
+    case Integer.parse(cleaned) do
+      {n, ""} -> {:ok, n}
+      _ -> {:error, "invalid number: #{str}"}
+    end
   end
 
   defp parse_unit(str) do
-    case String.downcase(str) do
-      "second" <> _ -> :second
-      "minute" <> _ -> :minute
-      "hour" <> _ -> :hour
-      "day" <> _ -> :day
-      "week" <> _ -> :week
-      "month" <> _ -> :month
-      "year" <> _ -> :year
-      _ -> raise ArgumentError, "unsupported unit: #{str}"
+    case Map.fetch(@units, str) do
+      {:ok, u} -> {:ok, u}
+      :error -> {:error, "unsupported unit: #{str}"}
     end
+  end
+
+  defp lookup_weekday(str) do
+    case Map.fetch(@weekdays, str) do
+      {:ok, n} -> {:ok, n}
+      :error -> {:error, "unsupported weekday: #{str}"}
+    end
+  end
+
+  defp current_weekday(opts) do
+    opts
+    |> Keyword.get(:reference_date, DateTime.utc_now())
+    |> DateTime.to_date()
+    |> Date.day_of_week()
   end
 end
