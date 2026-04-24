@@ -68,6 +68,47 @@ defmodule Chronix.DurationTest do
       assert Duration.parse("last Monday", reference_date: monday) == {:ok, {:day, -7}}
     end
 
+    test "parses extra units: quarter, fortnight, decade, century" do
+      assert Duration.parse("in 1 quarter") == {:ok, {:month, 3}}
+      assert Duration.parse("2 quarters ago") == {:ok, {:month, -6}}
+      assert Duration.parse("in a fortnight") == {:ok, {:day, 14}}
+      assert Duration.parse("3 fortnights from now") == {:ok, {:day, 42}}
+      assert Duration.parse("in 1 decade") == {:ok, {:year, 10}}
+      assert Duration.parse("a decade ago") == {:ok, {:year, -10}}
+      assert Duration.parse("in 1 century") == {:ok, {:year, 100}}
+      assert Duration.parse("2 centuries ago") == {:ok, {:year, -200}}
+    end
+
+    test "treats integer-valued fractionals as integers" do
+      # 0.5 decades = 5 years exactly — should NOT be rejected as fractional
+      assert Duration.parse("in 0.5 decades") == {:ok, {:year, 5}}
+      # 1.5 decades = 15 years exactly
+      assert Duration.parse("1.5 decades from now") == {:ok, {:year, 15}}
+      # 0.5 quarters = 1.5 months (non-integer) — rejected
+      assert Duration.parse("in 0.5 quarters") ==
+               {:error, "fractional months are not supported"}
+
+      # 5.0 hours collapses to {:hour, 5} (was {:microsecond, ...} before)
+      assert Duration.parse("in 5.0 hours") == {:ok, {:hour, 5}}
+    end
+
+    test "parses 'this <weekday>' as upcoming including today" do
+      monday = ~U[2025-01-27 00:00:00Z]
+      assert Duration.parse("this monday", reference_date: monday) == {:ok, {:day, 0}}
+      assert Duration.parse("this tuesday", reference_date: monday) == {:ok, {:day, 1}}
+      assert Duration.parse("this sunday", reference_date: monday) == {:ok, {:day, 6}}
+
+      # From a Wednesday, "this monday" has already passed → next Monday
+      wednesday = ~U[2025-01-29 00:00:00Z]
+      assert Duration.parse("this monday", reference_date: wednesday) == {:ok, {:day, 5}}
+    end
+
+    test "parses 'on <weekday>' equivalently to 'this <weekday>'" do
+      monday = ~U[2025-01-27 00:00:00Z]
+      assert Duration.parse("on monday", reference_date: monday) == {:ok, {:day, 0}}
+      assert Duration.parse("on friday", reference_date: monday) == {:ok, {:day, 4}}
+    end
+
     test "parses next/last time period formats" do
       assert Duration.parse("next week") == {:ok, {:week, 1}}
       assert Duration.parse("next month") == {:ok, {:month, 1}}

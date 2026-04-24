@@ -148,6 +148,30 @@ defmodule ChronixTest do
       assert Chronix.expression?("a day")
     end
 
+    test "identifies extra units (quarter, fortnight, decade, century)" do
+      assert Chronix.expression?("in 1 quarter")
+      assert Chronix.expression?("2 quarters ago")
+      assert Chronix.expression?("in a fortnight")
+      assert Chronix.expression?("in 1 decade")
+      assert Chronix.expression?("in 2 centuries")
+      assert Chronix.expression?("in 0.5 decades")
+    end
+
+    test "identifies pleonasms ('this week', 'tonight', 'tomorrow morning', etc.)" do
+      assert Chronix.expression?("this week")
+      assert Chronix.expression?("this month")
+      assert Chronix.expression?("this year")
+      assert Chronix.expression?("this morning")
+      assert Chronix.expression?("this afternoon")
+      assert Chronix.expression?("this evening")
+      assert Chronix.expression?("tonight")
+      assert Chronix.expression?("last night")
+      assert Chronix.expression?("tomorrow morning")
+      assert Chronix.expression?("yesterday evening")
+      assert Chronix.expression?("on monday")
+      assert Chronix.expression?("this friday")
+    end
+
     test "identifies time-of-day expressions" do
       assert Chronix.expression?("noon")
       assert Chronix.expression?("midnight")

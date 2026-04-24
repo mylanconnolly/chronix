@@ -109,15 +109,16 @@ iex> Chronix.parse("end of 1 year from now", reference_date: reference)
 - Future: `"in X <unit>s"` or `"X <unit>s from now"`
 - Past: `"X <unit>s ago"`
 - Bare: `"X <unit>s"` (treated as future from the reference date)
-- Weekday: `"next monday"`, `"last friday"`, etc.
+- Weekday: `"next monday"`, `"last friday"`, `"this monday"`, `"on monday"`. `"this"` and `"on"` resolve to the soonest upcoming occurrence (today itself if it matches).
 - Period: `"next week" | "next month" | "next year"` (and `"last ..."`)
+- Pleonasms: `"this week"`, `"this month"`, `"this year"` (resolve to the reference date); `"this morning"` (09:00), `"this afternoon"` (15:00), `"this evening"` (19:00), `"tonight"` (20:00), `"last night"` (yesterday 20:00); `"tomorrow morning"`, `"yesterday evening"`, and all other `{today,tomorrow,yesterday} × {morning,afternoon,evening,night}` combinations.
 - Boundaries: `"beginning of ..."`, `"end of ..."` applied to any of the above
 - Explicit dates: `mm/dd/yyyy`, `dd/mm/yyyy`, `mm-dd-yyyy`, `dd-mm-yyyy`, `yyyy-mm-dd`, `yyyy/mm/dd` (midnight UTC). Month and day components may be unpadded (`"1/5/2024"`, `"2024-1-5"`); year must be four digits. Ambiguous three-component forms default to US-style (month first); pass `endian: :eu` to flip that.
 - ISO-8601 timestamps: `"2024-12-25T15:30:00Z"`, `"2024-12-25T15:30:00+02:00"`, `"2024-12-25T15:30:00.123456Z"`. Non-UTC offsets are converted to UTC. A bare space (`"2024-12-25 15:30:00Z"`) also works. A trailing offset is required — naive timestamps like `"2024-12-25T15:30:00"` are rejected (use `"2024-12-25 at 15:30"` instead).
 - Time-of-day: `"noon"`, `"midnight"`, `"3pm"`, `"3 p.m."`, `"3:15pm"`, `"3:15:30pm"`, `"15:30"`, `"15:30:45"`. On its own, resolves to the reference date at that time.
 - Combined date + time: any date expression followed by `" at "` and a time — `"tomorrow at 3pm"`, `"next monday at noon"`, `"2024-12-25 at 3pm"`, `"in 3 days at 8am"`. Bare `"at 3pm"` is shorthand for today at that time.
 
-Supported units: `second`, `minute`, `hour`, `day`, `week`, `month`, `year` (each also accepts the plural).
+Supported units: `second`, `minute`, `hour`, `day`, `week`, `fortnight` (= 14 days), `month`, `quarter` (= 3 months), `year`, `decade` (= 10 years), `century` (= 100 years). Each accepts the plural form as well.
 
 Numbers may include commas for readability (`"in 1,000 seconds"`) and can be fractional for fixed-duration units (`"in 1.5 hours"`, `"0.5 days ago"`). Fractional months and years are rejected (no unambiguous conversion); `"beginning of"` / `"end of"` require integer durations. The words `"a"` and `"an"` are accepted as synonyms for `1` (`"in a week"`, `"an hour ago"`).
 

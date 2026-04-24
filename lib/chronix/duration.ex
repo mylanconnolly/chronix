@@ -15,20 +15,28 @@ defmodule Chronix.Duration do
   }
 
   @units %{
-    "second" => :second,
-    "seconds" => :second,
-    "minute" => :minute,
-    "minutes" => :minute,
-    "hour" => :hour,
-    "hours" => :hour,
-    "day" => :day,
-    "days" => :day,
-    "week" => :week,
-    "weeks" => :week,
-    "month" => :month,
-    "months" => :month,
-    "year" => :year,
-    "years" => :year
+    "second" => {:second, 1},
+    "seconds" => {:second, 1},
+    "minute" => {:minute, 1},
+    "minutes" => {:minute, 1},
+    "hour" => {:hour, 1},
+    "hours" => {:hour, 1},
+    "day" => {:day, 1},
+    "days" => {:day, 1},
+    "week" => {:week, 1},
+    "weeks" => {:week, 1},
+    "fortnight" => {:day, 14},
+    "fortnights" => {:day, 14},
+    "month" => {:month, 1},
+    "months" => {:month, 1},
+    "quarter" => {:month, 3},
+    "quarters" => {:month, 3},
+    "year" => {:year, 1},
+    "years" => {:year, 1},
+    "decade" => {:year, 10},
+    "decades" => {:year, 10},
+    "century" => {:year, 100},
+    "centuries" => {:year, 100}
   }
 
   @type unit :: :second | :minute | :hour | :day | :week | :month | :year | :microsecond
@@ -104,6 +112,9 @@ defmodule Chronix.Duration do
     end
   end
 
+  defp do_parse("this " <> weekday, opts), do: upcoming_weekday(weekday, opts)
+  defp do_parse("on " <> weekday, opts), do: upcoming_weekday(weekday, opts)
+
   defp do_parse("in " <> rest, _opts) do
     case String.split(rest, " ") do
       [_num, _unit, "ago"] ->
@@ -129,22 +140,38 @@ defmodule Chronix.Duration do
     end
   end
 
+  defp upcoming_weekday(weekday, opts) do
+    with {:ok, target} <- lookup_weekday(weekday) do
+      current = current_weekday(opts)
+      days = if target >= current, do: target - current, else: 7 - current + target
+      {:ok, {:day, days}}
+    end
+  end
+
   defp build(num_str, unit_str, sign) do
     with {:ok, n} <- parse_number(num_str),
-         {:ok, u} <- parse_unit(unit_str) do
-      normalize(u, n * sign)
+         {:ok, {u, mult}} <- parse_unit(unit_str) do
+      normalize(u, n * sign * mult)
     end
   end
 
   defp normalize(unit, n) when is_integer(n), do: {:ok, {unit, n}}
 
-  defp normalize(:month, n) when is_float(n),
+  defp normalize(unit, n) when is_float(n) do
+    if n == Float.floor(n) do
+      normalize(unit, trunc(n))
+    else
+      normalize_fractional(unit, n)
+    end
+  end
+
+  defp normalize_fractional(:month, _),
     do: {:error, "fractional months are not supported"}
 
-  defp normalize(:year, n) when is_float(n),
+  defp normalize_fractional(:year, _),
     do: {:error, "fractional years are not supported"}
 
-  defp normalize(unit, n) when is_float(n) do
+  defp normalize_fractional(unit, n) do
     {:ok, {:microsecond, round(n * unit_in_microseconds(unit))}}
   end
 

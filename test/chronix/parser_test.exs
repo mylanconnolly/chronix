@@ -123,6 +123,53 @@ defmodule Chronix.ParserTest do
                {:error, "fractional years are not supported"}
     end
 
+    test "parses 'this week/month/year' as the reference date" do
+      ref = ~U[2025-01-27 12:00:00Z]
+
+      assert Parser.parse_expression("this week", reference_date: ref) == {:ok, ref}
+      assert Parser.parse_expression("this month", reference_date: ref) == {:ok, ref}
+      assert Parser.parse_expression("this year", reference_date: ref) == {:ok, ref}
+    end
+
+    test "parses time-of-day pleonasms" do
+      ref = ~U[2025-01-27 12:00:00Z]
+
+      assert Parser.parse_expression("this morning", reference_date: ref) ==
+               {:ok, ~U[2025-01-27 09:00:00.000000Z]}
+
+      assert Parser.parse_expression("this afternoon", reference_date: ref) ==
+               {:ok, ~U[2025-01-27 15:00:00.000000Z]}
+
+      assert Parser.parse_expression("this evening", reference_date: ref) ==
+               {:ok, ~U[2025-01-27 19:00:00.000000Z]}
+
+      assert Parser.parse_expression("tonight", reference_date: ref) ==
+               {:ok, ~U[2025-01-27 20:00:00.000000Z]}
+
+      assert Parser.parse_expression("last night", reference_date: ref) ==
+               {:ok, ~U[2025-01-26 20:00:00.000000Z]}
+
+      assert Parser.parse_expression("tomorrow morning", reference_date: ref) ==
+               {:ok, ~U[2025-01-28 09:00:00.000000Z]}
+
+      assert Parser.parse_expression("tomorrow night", reference_date: ref) ==
+               {:ok, ~U[2025-01-28 20:00:00.000000Z]}
+
+      assert Parser.parse_expression("yesterday afternoon", reference_date: ref) ==
+               {:ok, ~U[2025-01-26 15:00:00.000000Z]}
+    end
+
+    test "parses 'on <weekday>' and 'this <weekday>' through duration path" do
+      # Reference is a Monday
+      monday = ~U[2025-01-27 12:00:00Z]
+
+      assert Parser.parse_expression("this monday", reference_date: monday) == {:ok, monday}
+      assert Parser.parse_expression("on monday", reference_date: monday) == {:ok, monday}
+
+      assert Parser.parse_expression("on friday", reference_date: monday) ==
+               {:ok, DateTime.add(monday, 4 * 86_400, :second)}
+    end
+
     test "parses bare time-of-day against the reference date" do
       ref = ~U[2025-01-27 10:30:45.000000Z]
 

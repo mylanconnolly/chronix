@@ -62,6 +62,28 @@ defmodule Chronix.Parser do
   defp do_parse("noon", opts), do: {:ok, set_time(ref(opts), ~T[12:00:00.000000])}
   defp do_parse("midnight", opts), do: {:ok, set_time(ref(opts), ~T[00:00:00.000000])}
 
+  defp do_parse("this week", opts), do: {:ok, ref(opts)}
+  defp do_parse("this month", opts), do: {:ok, ref(opts)}
+  defp do_parse("this year", opts), do: {:ok, ref(opts)}
+
+  defp do_parse("this morning", opts), do: day_at(opts, 0, ~T[09:00:00.000000])
+  defp do_parse("this afternoon", opts), do: day_at(opts, 0, ~T[15:00:00.000000])
+  defp do_parse("this evening", opts), do: day_at(opts, 0, ~T[19:00:00.000000])
+  defp do_parse("this night", opts), do: day_at(opts, 0, ~T[20:00:00.000000])
+
+  defp do_parse("tonight", opts), do: day_at(opts, 0, ~T[20:00:00.000000])
+  defp do_parse("last night", opts), do: day_at(opts, -1, ~T[20:00:00.000000])
+
+  defp do_parse("tomorrow morning", opts), do: day_at(opts, 1, ~T[09:00:00.000000])
+  defp do_parse("tomorrow afternoon", opts), do: day_at(opts, 1, ~T[15:00:00.000000])
+  defp do_parse("tomorrow evening", opts), do: day_at(opts, 1, ~T[19:00:00.000000])
+  defp do_parse("tomorrow night", opts), do: day_at(opts, 1, ~T[20:00:00.000000])
+
+  defp do_parse("yesterday morning", opts), do: day_at(opts, -1, ~T[09:00:00.000000])
+  defp do_parse("yesterday afternoon", opts), do: day_at(opts, -1, ~T[15:00:00.000000])
+  defp do_parse("yesterday evening", opts), do: day_at(opts, -1, ~T[19:00:00.000000])
+  defp do_parse("yesterday night", opts), do: day_at(opts, -1, ~T[20:00:00.000000])
+
   defp do_parse("at " <> time_str, opts) do
     with {:ok, time} <- TimeParser.parse(time_str) do
       {:ok, set_time(ref(opts), time)}
@@ -144,6 +166,11 @@ defmodule Chronix.Parser do
 
   defp set_time(dt, %Time{hour: h, minute: m, second: s, microsecond: us}) do
     %{dt | hour: h, minute: m, second: s, microsecond: us}
+  end
+
+  defp day_at(opts, day_offset, time) do
+    shifted = DateTime.shift(ref(opts), [{:day, day_offset}])
+    {:ok, set_time(shifted, time)}
   end
 
   defp apply_shift(dt, {:microsecond, n}), do: DateTime.add(dt, n, :microsecond)
