@@ -1,9 +1,13 @@
 defmodule Chronix.Parser do
   @moduledoc """
   Core parsing logic for Chronix. Prefer the top-level `Chronix` API.
+
+  Orchestrates: normalize → (ISO-8601 short-circuit) → (" at " split for
+  composed date+time) → grammar (`Chronix.Grammar.expression/1`) →
+  evaluator (`Chronix.Evaluator.resolve/2`).
   """
 
-  alias Chronix.Duration
+  alias Chronix.{Duration, Evaluator, Grammar}
   alias Chronix.Time, as: TimeParser
 
   @type result :: {:ok, DateTime.t()} | {:error, String.t()}
@@ -31,205 +35,96 @@ defmodule Chronix.Parser do
   def parse_expression(date_string, opts) when is_binary(date_string) do
     trimmed = String.trim(date_string)
 
-    case DateTime.from_iso8601(trimmed) do
-      {:ok, dt, _offset} -> {:ok, dt}
-      _ -> trimmed |> String.downcase() |> do_parse(opts)
+    cond do
+      trimmed == "" ->
+        {:error, "empty expression"}
+
+      true ->
+        case DateTime.from_iso8601(trimmed) do
+          {:ok, dt, _offset} -> {:ok, dt}
+          _ -> parse_relative(String.downcase(trimmed), opts)
+        end
     end
   end
 
   def parse_expression(_, _), do: {:error, "expected a string"}
 
-  defp ref(opts), do: Keyword.get(opts, :reference_date, DateTime.utc_now())
+  # ── After normalization ───────────────────────────────────────────────
 
-  defp do_parse("", _opts), do: {:error, "empty expression"}
-  defp do_parse("today", opts), do: {:ok, ref(opts)}
-  defp do_parse("now", opts), do: {:ok, ref(opts)}
-  defp do_parse("tomorrow", opts), do: {:ok, DateTime.shift(ref(opts), [{:day, 1}])}
-  defp do_parse("yesterday", opts), do: {:ok, DateTime.shift(ref(opts), [{:day, -1}])}
-
-  defp do_parse("the day after tomorrow", opts),
-    do: {:ok, DateTime.shift(ref(opts), [{:day, 2}])}
-
-  defp do_parse("day after tomorrow", opts),
-    do: {:ok, DateTime.shift(ref(opts), [{:day, 2}])}
-
-  defp do_parse("the day before yesterday", opts),
-    do: {:ok, DateTime.shift(ref(opts), [{:day, -2}])}
-
-  defp do_parse("day before yesterday", opts),
-    do: {:ok, DateTime.shift(ref(opts), [{:day, -2}])}
-
-  defp do_parse("noon", opts), do: {:ok, set_time(ref(opts), ~T[12:00:00.000000])}
-  defp do_parse("midnight", opts), do: {:ok, set_time(ref(opts), ~T[00:00:00.000000])}
-
-  defp do_parse("this week", opts), do: {:ok, ref(opts)}
-  defp do_parse("this month", opts), do: {:ok, ref(opts)}
-  defp do_parse("this year", opts), do: {:ok, ref(opts)}
-
-  defp do_parse("this morning", opts), do: day_at(opts, 0, ~T[09:00:00.000000])
-  defp do_parse("this afternoon", opts), do: day_at(opts, 0, ~T[15:00:00.000000])
-  defp do_parse("this evening", opts), do: day_at(opts, 0, ~T[19:00:00.000000])
-  defp do_parse("this night", opts), do: day_at(opts, 0, ~T[20:00:00.000000])
-
-  defp do_parse("tonight", opts), do: day_at(opts, 0, ~T[20:00:00.000000])
-  defp do_parse("last night", opts), do: day_at(opts, -1, ~T[20:00:00.000000])
-
-  defp do_parse("tomorrow morning", opts), do: day_at(opts, 1, ~T[09:00:00.000000])
-  defp do_parse("tomorrow afternoon", opts), do: day_at(opts, 1, ~T[15:00:00.000000])
-  defp do_parse("tomorrow evening", opts), do: day_at(opts, 1, ~T[19:00:00.000000])
-  defp do_parse("tomorrow night", opts), do: day_at(opts, 1, ~T[20:00:00.000000])
-
-  defp do_parse("yesterday morning", opts), do: day_at(opts, -1, ~T[09:00:00.000000])
-  defp do_parse("yesterday afternoon", opts), do: day_at(opts, -1, ~T[15:00:00.000000])
-  defp do_parse("yesterday evening", opts), do: day_at(opts, -1, ~T[19:00:00.000000])
-  defp do_parse("yesterday night", opts), do: day_at(opts, -1, ~T[20:00:00.000000])
-
-  defp do_parse("at " <> time_str, opts) do
-    with {:ok, time} <- TimeParser.parse(time_str) do
-      {:ok, set_time(ref(opts), time)}
+  defp parse_relative(normalized, opts) do
+    if String.contains?(normalized, " at ") do
+      try_combined_at(normalized, opts)
+    else
+      parse_single(normalized, opts)
     end
   end
 
-  defp do_parse("beginning of " <> rest, opts) do
-    with {:ok, duration} <- Duration.parse(rest, opts),
-         :ok <- require_integer_boundary(duration) do
-      shifted = apply_shift(ref(opts), duration)
-      {:ok, beginning_of(shifted, duration)}
+  defp parse_single(normalized, opts) do
+    case Grammar.expression(normalized) do
+      {:ok, [ast], _, _, _, _} ->
+        finalize(Evaluator.resolve(ast, opts), normalized)
+
+      {:error, {:chronix_error, reason}, _, _, _, _} ->
+        {:error, reason}
+
+      _ ->
+        fallback_error(normalized, opts)
     end
   end
 
-  defp do_parse("end of " <> rest, opts) do
-    with {:ok, duration} <- Duration.parse(rest, opts),
-         :ok <- require_integer_boundary(duration) do
-      shifted = apply_shift(ref(opts), duration)
-      {:ok, end_of(shifted, duration)}
-    end
-  end
-
-  @year_last_slash ~r/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/
-  @year_last_dash ~r/^(\d{1,2})-(\d{1,2})-(\d{4})$/
-  @year_first_slash ~r/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/
-  @year_first_dash ~r/^(\d{4})-(\d{1,2})-(\d{1,2})$/
-
-  defp do_parse(str, opts) do
+  # When the grammar fails, check whether a boundary prefix is present —
+  # if so, surface the inner Duration error for a more specific message.
+  defp fallback_error(normalized, opts) do
     cond do
-      parts = Regex.run(@year_first_dash, str) ->
-        [_, year, month, day] = parts
-        parse_ymd(year, month, day, str)
+      inner = extract_boundary_inner(normalized, "beginning of ") ->
+        duration_fallback(inner, normalized, opts)
 
-      parts = Regex.run(@year_first_slash, str) ->
-        [_, year, month, day] = parts
-        parse_ymd(year, month, day, str)
-
-      parts = Regex.run(@year_last_slash, str) ->
-        parse_year_last(parts, str, opts)
-
-      parts = Regex.run(@year_last_dash, str) ->
-        parse_year_last(parts, str, opts)
-
-      String.contains?(str, " at ") ->
-        try_combined_at(str, opts)
+      inner = extract_boundary_inner(normalized, "end of ") ->
+        duration_fallback(inner, normalized, opts)
 
       true ->
-        try_time_or_duration(str, opts)
+        {:error, "unsupported expression: #{normalized}"}
     end
   end
 
-  defp parse_year_last([_, a, b, year], str, opts) do
-    case Keyword.get(opts, :endian, :us) do
-      :us -> parse_ymd(year, a, b, str)
-      :eu -> parse_ymd(year, b, a, str)
-      other -> {:error, "invalid :endian option: #{inspect(other)} (expected :us or :eu)"}
+  defp extract_boundary_inner(normalized, prefix) do
+    if String.starts_with?(normalized, prefix) do
+      normalized |> String.replace_prefix(prefix, "") |> String.trim()
     end
   end
 
-  defp try_combined_at(str, opts) do
-    [date_part, time_part] = String.split(str, " at ", parts: 2)
-
-    with {:ok, time} <- TimeParser.parse(time_part),
-         {:ok, dt} <- do_parse(String.trim(date_part), opts) do
-      {:ok, set_time(dt, time)}
+  defp duration_fallback(inner, normalized, opts) do
+    case Duration.parse(inner, opts) do
+      {:error, reason} -> {:error, reason}
+      _ -> {:error, "unsupported expression: #{normalized}"}
     end
   end
 
-  defp try_time_or_duration(str, opts) do
-    case TimeParser.parse(str) do
-      {:ok, time} ->
-        {:ok, set_time(ref(opts), time)}
+  defp try_combined_at(normalized, opts) do
+    [date_part, time_part] = String.split(normalized, " at ", parts: 2)
 
-      {:error, _} ->
-        with {:ok, duration} <- Duration.parse(str, opts) do
-          {:ok, apply_shift(ref(opts), duration)}
-        end
+    with {:ok, dt} <- parse_relative(String.trim(date_part), opts),
+         {:ok, time} <- TimeParser.parse(String.trim(time_part)) do
+      {:ok, apply_time(dt, time)}
     end
   end
 
-  defp set_time(dt, %Time{hour: h, minute: m, second: s, microsecond: us}) do
+  # ── Error finalization ────────────────────────────────────────────────
+
+  defp finalize({:ok, _} = ok, _normalized), do: ok
+
+  defp finalize({:error, :invalid_date}, normalized),
+    do: {:error, "invalid date: #{normalized}"}
+
+  defp finalize({:error, :invalid_time}, normalized),
+    do: {:error, "invalid time: #{normalized}"}
+
+  defp finalize({:error, reason}, _normalized) when is_binary(reason),
+    do: {:error, reason}
+
+  # ── Helpers ───────────────────────────────────────────────────────────
+
+  defp apply_time(dt, %Time{hour: h, minute: m, second: s, microsecond: us}) do
     %{dt | hour: h, minute: m, second: s, microsecond: us}
   end
-
-  defp day_at(opts, day_offset, time) do
-    shifted = DateTime.shift(ref(opts), [{:day, day_offset}])
-    {:ok, set_time(shifted, time)}
-  end
-
-  defp apply_shift(dt, {:microsecond, n}), do: DateTime.add(dt, n, :microsecond)
-  defp apply_shift(dt, shift), do: DateTime.shift(dt, [shift])
-
-  defp require_integer_boundary({:microsecond, _}),
-    do: {:error, "'beginning of' and 'end of' require an integer duration"}
-
-  defp require_integer_boundary(_), do: :ok
-
-  defp parse_ymd(year_str, month_str, day_str, original) do
-    with {year, ""} <- Integer.parse(year_str),
-         {month, ""} <- Integer.parse(month_str),
-         {day, ""} <- Integer.parse(day_str),
-         {:ok, date} <- Date.new(year, month, day),
-         {:ok, dt} <- DateTime.new(date, ~T[00:00:00], "Etc/UTC") do
-      {:ok, dt}
-    else
-      _ -> {:error, "invalid date: #{original}"}
-    end
-  end
-
-  defp beginning_of(dt, {:second, _}), do: %{dt | microsecond: {0, 6}}
-  defp beginning_of(dt, {:minute, _}), do: %{dt | second: 0, microsecond: {0, 6}}
-  defp beginning_of(dt, {:hour, _}), do: %{dt | minute: 0, second: 0, microsecond: {0, 6}}
-
-  defp beginning_of(dt, {:day, _}),
-    do: %{dt | hour: 0, minute: 0, second: 0, microsecond: {0, 6}}
-
-  defp beginning_of(dt, {:week, _}) do
-    dt
-    |> DateTime.add(-((Date.day_of_week(dt) - 1) * 86_400), :second)
-    |> then(&%{&1 | hour: 0, minute: 0, second: 0, microsecond: {0, 6}})
-  end
-
-  defp beginning_of(dt, {:month, _}),
-    do: %{dt | day: 1, hour: 0, minute: 0, second: 0, microsecond: {0, 6}}
-
-  defp beginning_of(dt, {:year, _}),
-    do: %{dt | month: 1, day: 1, hour: 0, minute: 0, second: 0, microsecond: {0, 6}}
-
-  defp end_of(dt, {:second, _}), do: %{dt | microsecond: {999_999, 6}}
-  defp end_of(dt, {:minute, _}), do: %{dt | second: 59, microsecond: {999_999, 6}}
-  defp end_of(dt, {:hour, _}), do: %{dt | minute: 59, second: 59, microsecond: {999_999, 6}}
-
-  defp end_of(dt, {:day, _}),
-    do: %{dt | hour: 23, minute: 59, second: 59, microsecond: {999_999, 6}}
-
-  defp end_of(dt, {:week, _}) do
-    dt
-    |> DateTime.add((7 - Date.day_of_week(dt)) * 86_400, :second)
-    |> then(&%{&1 | hour: 23, minute: 59, second: 59, microsecond: {999_999, 6}})
-  end
-
-  defp end_of(dt, {:month, _}) do
-    days_in_month = Calendar.ISO.days_in_month(dt.year, dt.month)
-    %{dt | day: days_in_month, hour: 23, minute: 59, second: 59, microsecond: {999_999, 6}}
-  end
-
-  defp end_of(dt, {:year, _}),
-    do: %{dt | month: 12, day: 31, hour: 23, minute: 59, second: 59, microsecond: {999_999, 6}}
 end
