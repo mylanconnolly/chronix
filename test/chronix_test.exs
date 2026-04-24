@@ -120,6 +120,10 @@ defmodule ChronixTest do
       assert Chronix.expression?("01/01/2023")
       assert Chronix.expression?("1/5/2024")
       assert Chronix.expression?("2024-1-5")
+      assert Chronix.expression?("12-25-2024")
+      assert Chronix.expression?("2024/12/25")
+      assert Chronix.expression?("2024-12-25T15:30:00Z")
+      assert Chronix.expression?("2024-12-25T15:30:00+02:00")
     end
 
     test "identifies tomorrow and yesterday" do

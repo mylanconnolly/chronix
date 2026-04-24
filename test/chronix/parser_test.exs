@@ -280,6 +280,68 @@ defmodule Chronix.ParserTest do
       assert Parser.parse_expression("2024-02-30") == {:error, "invalid date: 2024-02-30"}
     end
 
+    test "parses ISO-8601 timestamps" do
+      assert Parser.parse_expression("2024-12-25T15:30:00Z") ==
+               {:ok, ~U[2024-12-25 15:30:00Z]}
+
+      assert Parser.parse_expression("2024-12-25T15:30:00.123456Z") ==
+               {:ok, ~U[2024-12-25 15:30:00.123456Z]}
+
+      # Non-UTC offsets are converted to UTC
+      assert Parser.parse_expression("2024-12-25T15:30:00+02:00") ==
+               {:ok, ~U[2024-12-25 13:30:00Z]}
+
+      # Space separator is accepted
+      assert Parser.parse_expression("2024-12-25 15:30:00Z") ==
+               {:ok, ~U[2024-12-25 15:30:00Z]}
+
+      # Leading/trailing whitespace tolerated
+      assert Parser.parse_expression("  2024-12-25T15:30:00Z  ") ==
+               {:ok, ~U[2024-12-25 15:30:00Z]}
+    end
+
+    test "rejects ISO-like strings missing required parts" do
+      # No offset
+      assert {:error, _} = Parser.parse_expression("2024-12-25T15:30:00")
+      # Lowercase T/Z not valid ISO — and won't match other patterns either
+      assert {:error, _} = Parser.parse_expression("2024-12-25t15:30:00z")
+    end
+
+    test "parses yyyy/mm/dd (unambiguous year-first slash form)" do
+      assert Parser.parse_expression("2024/12/25") == {:ok, ~U[2024-12-25 00:00:00Z]}
+      assert Parser.parse_expression("2024/1/5") == {:ok, ~U[2024-01-05 00:00:00Z]}
+    end
+
+    test "parses mm-dd-yyyy as US-style by default" do
+      assert Parser.parse_expression("12-25-2024") == {:ok, ~U[2024-12-25 00:00:00Z]}
+      assert Parser.parse_expression("1-5-2024") == {:ok, ~U[2024-01-05 00:00:00Z]}
+    end
+
+    test "honors :endian for ambiguous three-component dates" do
+      # Slash form
+      assert Parser.parse_expression("05/01/2024", endian: :us) ==
+               {:ok, ~U[2024-05-01 00:00:00Z]}
+
+      assert Parser.parse_expression("05/01/2024", endian: :eu) ==
+               {:ok, ~U[2024-01-05 00:00:00Z]}
+
+      # Dash form
+      assert Parser.parse_expression("05-01-2024", endian: :us) ==
+               {:ok, ~U[2024-05-01 00:00:00Z]}
+
+      assert Parser.parse_expression("05-01-2024", endian: :eu) ==
+               {:ok, ~U[2024-01-05 00:00:00Z]}
+
+      # Unambiguous year-first form is unaffected by :endian
+      assert Parser.parse_expression("2024-05-01", endian: :eu) ==
+               {:ok, ~U[2024-05-01 00:00:00Z]}
+    end
+
+    test "rejects an invalid :endian value" do
+      assert {:error, reason} = Parser.parse_expression("05/01/2024", endian: :weird)
+      assert reason =~ "invalid :endian"
+    end
+
     test "accepts unpadded yyyy-mm-dd components" do
       assert Parser.parse_expression("2024-1-5") == {:ok, ~U[2024-01-05 00:00:00Z]}
       assert Parser.parse_expression("2024-1-15") == {:ok, ~U[2024-01-15 00:00:00Z]}

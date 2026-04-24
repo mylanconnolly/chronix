@@ -19,15 +19,22 @@ defmodule Chronix.Parser do
     * `:reference_date` — a `DateTime` used as the "now" for all relative
       expressions, including `"today"` and `"now"`. Defaults to
       `DateTime.utc_now/0`.
+
+    * `:endian` — how to interpret ambiguous three-component dates like
+      `"01/05/2024"` or `"01-05-2024"`. Accepts `:us` (default, month-first
+      → January 5) or `:eu` (day-first → May 1). Unambiguous formats (year
+      first, or full ISO-8601) are unaffected.
   """
   @spec parse_expression(String.t(), keyword) :: result
   def parse_expression(date_string, opts \\ [])
 
   def parse_expression(date_string, opts) when is_binary(date_string) do
-    date_string
-    |> String.downcase()
-    |> String.trim()
-    |> do_parse(opts)
+    trimmed = String.trim(date_string)
+
+    case DateTime.from_iso8601(trimmed) do
+      {:ok, dt, _offset} -> {:ok, dt}
+      _ -> trimmed |> String.downcase() |> do_parse(opts)
+    end
   end
 
   def parse_expression(_, _), do: {:error, "expected a string"}
@@ -77,24 +84,40 @@ defmodule Chronix.Parser do
     end
   end
 
-  @slash_date ~r/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/
-  @dash_date ~r/^(\d{4})-(\d{1,2})-(\d{1,2})$/
+  @year_last_slash ~r/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/
+  @year_last_dash ~r/^(\d{1,2})-(\d{1,2})-(\d{4})$/
+  @year_first_slash ~r/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/
+  @year_first_dash ~r/^(\d{4})-(\d{1,2})-(\d{1,2})$/
 
   defp do_parse(str, opts) do
     cond do
-      parts = Regex.run(@slash_date, str) ->
-        [_, month, day, year] = parts
-        parse_ymd(year, month, day, str)
-
-      parts = Regex.run(@dash_date, str) ->
+      parts = Regex.run(@year_first_dash, str) ->
         [_, year, month, day] = parts
         parse_ymd(year, month, day, str)
+
+      parts = Regex.run(@year_first_slash, str) ->
+        [_, year, month, day] = parts
+        parse_ymd(year, month, day, str)
+
+      parts = Regex.run(@year_last_slash, str) ->
+        parse_year_last(parts, str, opts)
+
+      parts = Regex.run(@year_last_dash, str) ->
+        parse_year_last(parts, str, opts)
 
       String.contains?(str, " at ") ->
         try_combined_at(str, opts)
 
       true ->
         try_time_or_duration(str, opts)
+    end
+  end
+
+  defp parse_year_last([_, a, b, year], str, opts) do
+    case Keyword.get(opts, :endian, :us) do
+      :us -> parse_ymd(year, a, b, str)
+      :eu -> parse_ymd(year, b, a, str)
+      other -> {:error, "invalid :endian option: #{inspect(other)} (expected :us or :eu)"}
     end
   end
 
