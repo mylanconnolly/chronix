@@ -129,6 +129,14 @@ defmodule ChronixTest do
       assert Chronix.expression?("  yesterday  ")
     end
 
+    test "identifies 'the day after tomorrow' / 'the day before yesterday'" do
+      assert Chronix.expression?("the day after tomorrow")
+      assert Chronix.expression?("day after tomorrow")
+      assert Chronix.expression?("the day before yesterday")
+      assert Chronix.expression?("day before yesterday")
+      assert Chronix.expression?("THE DAY AFTER TOMORROW")
+    end
+
     test "identifies 'a' and 'an' quantifier expressions" do
       assert Chronix.expression?("in a week")
       assert Chronix.expression?("an hour ago")

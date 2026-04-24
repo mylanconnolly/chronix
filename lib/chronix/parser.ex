@@ -39,6 +39,18 @@ defmodule Chronix.Parser do
   defp do_parse("tomorrow", opts), do: {:ok, DateTime.shift(ref(opts), [{:day, 1}])}
   defp do_parse("yesterday", opts), do: {:ok, DateTime.shift(ref(opts), [{:day, -1}])}
 
+  defp do_parse("the day after tomorrow", opts),
+    do: {:ok, DateTime.shift(ref(opts), [{:day, 2}])}
+
+  defp do_parse("day after tomorrow", opts),
+    do: {:ok, DateTime.shift(ref(opts), [{:day, 2}])}
+
+  defp do_parse("the day before yesterday", opts),
+    do: {:ok, DateTime.shift(ref(opts), [{:day, -2}])}
+
+  defp do_parse("day before yesterday", opts),
+    do: {:ok, DateTime.shift(ref(opts), [{:day, -2}])}
+
   defp do_parse("beginning of " <> rest, opts) do
     with {:ok, duration} <- Duration.parse(rest, opts),
          :ok <- require_integer_boundary(duration) do

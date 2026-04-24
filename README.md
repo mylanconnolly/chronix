@@ -105,6 +105,7 @@ iex> Chronix.parse("end of 1 year from now", reference_date: reference)
 ## Supported formats
 
 - Single-token: `"now"`, `"today"`, `"tomorrow"`, `"yesterday"`
+- Compound day aliases: `"the day after tomorrow"`, `"the day before yesterday"` (the word `"the"` is optional)
 - Future: `"in X <unit>s"` or `"X <unit>s from now"`
 - Past: `"X <unit>s ago"`
 - Bare: `"X <unit>s"` (treated as future from the reference date)

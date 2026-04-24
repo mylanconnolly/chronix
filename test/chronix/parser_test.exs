@@ -28,6 +28,26 @@ defmodule Chronix.ParserTest do
                {:ok, ~U[2025-01-26 12:00:00Z]}
     end
 
+    test "parses 'the day after tomorrow' as 2 days after the reference" do
+      ref = ~U[2025-01-27 12:00:00Z]
+
+      assert Parser.parse_expression("the day after tomorrow", reference_date: ref) ==
+               {:ok, ~U[2025-01-29 12:00:00Z]}
+
+      assert Parser.parse_expression("day after tomorrow", reference_date: ref) ==
+               {:ok, ~U[2025-01-29 12:00:00Z]}
+    end
+
+    test "parses 'the day before yesterday' as 2 days before the reference" do
+      ref = ~U[2025-01-27 12:00:00Z]
+
+      assert Parser.parse_expression("the day before yesterday", reference_date: ref) ==
+               {:ok, ~U[2025-01-25 12:00:00Z]}
+
+      assert Parser.parse_expression("day before yesterday", reference_date: ref) ==
+               {:ok, ~U[2025-01-25 12:00:00Z]}
+    end
+
     test "tomorrow/yesterday honor month and year boundaries" do
       ref = ~U[2025-01-31 09:00:00Z]
 
