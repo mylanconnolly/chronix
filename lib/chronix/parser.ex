@@ -40,15 +40,17 @@ defmodule Chronix.Parser do
   defp do_parse("yesterday", opts), do: {:ok, DateTime.shift(ref(opts), [{:day, -1}])}
 
   defp do_parse("beginning of " <> rest, opts) do
-    with {:ok, duration} <- Duration.parse(rest, opts) do
-      shifted = DateTime.shift(ref(opts), [duration])
+    with {:ok, duration} <- Duration.parse(rest, opts),
+         :ok <- require_integer_boundary(duration) do
+      shifted = apply_shift(ref(opts), duration)
       {:ok, beginning_of(shifted, duration)}
     end
   end
 
   defp do_parse("end of " <> rest, opts) do
-    with {:ok, duration} <- Duration.parse(rest, opts) do
-      shifted = DateTime.shift(ref(opts), [duration])
+    with {:ok, duration} <- Duration.parse(rest, opts),
+         :ok <- require_integer_boundary(duration) do
+      shifted = apply_shift(ref(opts), duration)
       {:ok, end_of(shifted, duration)}
     end
   end
@@ -69,9 +71,17 @@ defmodule Chronix.Parser do
 
   defp do_parse(str, opts) do
     with {:ok, duration} <- Duration.parse(str, opts) do
-      {:ok, DateTime.shift(ref(opts), [duration])}
+      {:ok, apply_shift(ref(opts), duration)}
     end
   end
+
+  defp apply_shift(dt, {:microsecond, n}), do: DateTime.add(dt, n, :microsecond)
+  defp apply_shift(dt, shift), do: DateTime.shift(dt, [shift])
+
+  defp require_integer_boundary({:microsecond, _}),
+    do: {:error, "'beginning of' and 'end of' require an integer duration"}
+
+  defp require_integer_boundary(_), do: :ok
 
   defp parse_ymd(year_str, month_str, day_str, original) do
     with {year, ""} <- Integer.parse(year_str),

@@ -115,7 +115,7 @@ iex> Chronix.parse("end of 1 year from now", reference_date: reference)
 
 Supported units: `second`, `minute`, `hour`, `day`, `week`, `month`, `year` (each also accepts the plural).
 
-Numbers may include commas for readability (`"in 1,000 seconds"`). The words `"a"` and `"an"` are accepted as synonyms for `1` (`"in a week"`, `"an hour ago"`).
+Numbers may include commas for readability (`"in 1,000 seconds"`) and can be fractional for fixed-duration units (`"in 1.5 hours"`, `"0.5 days ago"`). Fractional months and years are rejected (no unambiguous conversion); `"beginning of"` / `"end of"` require integer durations. The words `"a"` and `"an"` are accepted as synonyms for `1` (`"in a week"`, `"an hour ago"`).
 
 Parsing is case-insensitive and whitespace-tolerant. Contradictory phrases like `"in 2 seconds ago"` are rejected with `{:error, _}` rather than silently normalized.
 

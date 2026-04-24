@@ -119,9 +119,24 @@ defmodule Chronix.DurationTest do
       assert Duration.parse("in 1 dayzz") == {:error, "unsupported unit: dayzz"}
     end
 
-    test "rejects non-integer numbers" do
-      assert Duration.parse("in 1.5 hours") == {:error, "invalid number: 1.5"}
+    test "rejects non-numeric tokens" do
       assert Duration.parse("in abc hours") == {:error, "invalid number: abc"}
+      assert Duration.parse("in 1.2.3 hours") == {:error, "invalid number: 1.2.3"}
+    end
+
+    test "parses fractional durations for fixed-duration units" do
+      assert Duration.parse("in 1.5 hours") == {:ok, {:microsecond, 5_400_000_000}}
+      assert Duration.parse("1.5 hours ago") == {:ok, {:microsecond, -5_400_000_000}}
+      assert Duration.parse("0.5 days") == {:ok, {:microsecond, 43_200_000_000}}
+      assert Duration.parse("in 2.5 weeks") == {:ok, {:microsecond, 1_512_000_000_000}}
+      assert Duration.parse("in .5 minutes") == {:ok, {:microsecond, 30_000_000}}
+      assert Duration.parse("in 1.5 seconds") == {:ok, {:microsecond, 1_500_000}}
+    end
+
+    test "rejects fractional months and years" do
+      assert Duration.parse("in 1.5 months") == {:error, "fractional months are not supported"}
+      assert Duration.parse("1.5 months ago") == {:error, "fractional months are not supported"}
+      assert Duration.parse("in 0.5 years") == {:error, "fractional years are not supported"}
     end
   end
 end

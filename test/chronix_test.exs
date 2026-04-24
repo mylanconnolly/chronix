@@ -134,6 +134,14 @@ defmodule ChronixTest do
       assert Chronix.expression?("a day")
     end
 
+    test "identifies fractional durations" do
+      assert Chronix.expression?("in 1.5 hours")
+      assert Chronix.expression?("0.5 days ago")
+      assert Chronix.expression?("2.5 weeks from now")
+      refute Chronix.expression?("in 1.5 months")
+      refute Chronix.expression?("in 0.5 years")
+    end
+
     test "rejects invalid expressions" do
       refute Chronix.expression?("next")
       refute Chronix.expression?("last")

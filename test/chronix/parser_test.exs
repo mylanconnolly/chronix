@@ -75,6 +75,34 @@ defmodule Chronix.ParserTest do
                {:ok, DateTime.add(ref, -24 * 60 * 60, :second)}
     end
 
+    test "parses fractional durations" do
+      ref = ~U[2025-01-27 00:00:00Z]
+
+      assert Parser.parse_expression("in 1.5 hours", reference_date: ref) ==
+               {:ok, DateTime.add(ref, 5_400_000_000, :microsecond)}
+
+      assert Parser.parse_expression("1.5 hours ago", reference_date: ref) ==
+               {:ok, DateTime.add(ref, -5_400_000_000, :microsecond)}
+
+      assert Parser.parse_expression("0.5 days from now", reference_date: ref) ==
+               {:ok, DateTime.add(ref, 43_200_000_000, :microsecond)}
+    end
+
+    test "rejects fractional durations in 'beginning of' / 'end of'" do
+      err = {:error, "'beginning of' and 'end of' require an integer duration"}
+
+      assert Parser.parse_expression("beginning of 1.5 hours from now") == err
+      assert Parser.parse_expression("end of 0.5 days from now") == err
+    end
+
+    test "propagates fractional month/year rejection" do
+      assert Parser.parse_expression("in 1.5 months") ==
+               {:error, "fractional months are not supported"}
+
+      assert Parser.parse_expression("in 0.5 years") ==
+               {:error, "fractional years are not supported"}
+    end
+
     test "parses 'a' / 'an' as a count of 1" do
       ref = ~U[2025-01-27 00:00:00Z]
 

@@ -31,7 +31,7 @@ defmodule Chronix.Duration do
     "years" => :year
   }
 
-  @type unit :: :second | :minute | :hour | :day | :week | :month | :year
+  @type unit :: :second | :minute | :hour | :day | :week | :month | :year | :microsecond
   @type duration :: {unit, integer}
   @type result :: {:ok, duration} | {:error, String.t()}
 
@@ -48,7 +48,10 @@ defmodule Chronix.Duration do
   - `"next week"` / `"last month"` / `"next year"` etc.
 
   Units accept singular or plural forms exactly (`second`/`seconds`, etc.).
-  Numbers may include commas (`"1,000 seconds"`).
+  Numbers may include commas (`"1,000 seconds"`) and may be fractional
+  (`"in 1.5 hours"`). Fractional durations are internally converted to a
+  `{:microsecond, n}` tuple; fractional months and years are rejected
+  because they have no unambiguous conversion.
 
   Weekday expressions are resolved against `:reference_date`, which
   defaults to `DateTime.utc_now/0`.
@@ -129,21 +132,51 @@ defmodule Chronix.Duration do
   defp build(num_str, unit_str, sign) do
     with {:ok, n} <- parse_number(num_str),
          {:ok, u} <- parse_unit(unit_str) do
-      {:ok, {u, n * sign}}
+      normalize(u, n * sign)
     end
   end
+
+  defp normalize(unit, n) when is_integer(n), do: {:ok, {unit, n}}
+
+  defp normalize(:month, n) when is_float(n),
+    do: {:error, "fractional months are not supported"}
+
+  defp normalize(:year, n) when is_float(n),
+    do: {:error, "fractional years are not supported"}
+
+  defp normalize(unit, n) when is_float(n) do
+    {:ok, {:microsecond, round(n * unit_in_microseconds(unit))}}
+  end
+
+  defp unit_in_microseconds(:second), do: 1_000_000
+  defp unit_in_microseconds(:minute), do: 60 * 1_000_000
+  defp unit_in_microseconds(:hour), do: 3_600 * 1_000_000
+  defp unit_in_microseconds(:day), do: 86_400 * 1_000_000
+  defp unit_in_microseconds(:week), do: 7 * 86_400 * 1_000_000
 
   defp parse_number("a"), do: {:ok, 1}
   defp parse_number("an"), do: {:ok, 1}
 
   defp parse_number(str) do
-    cleaned = String.replace(str, ",", "")
+    cleaned = str |> String.replace(",", "") |> leading_zero()
 
-    case Integer.parse(cleaned) do
-      {n, ""} -> {:ok, n}
-      _ -> {:error, "invalid number: #{str}"}
+    cond do
+      String.contains?(cleaned, ".") ->
+        case Float.parse(cleaned) do
+          {n, ""} -> {:ok, n}
+          _ -> {:error, "invalid number: #{str}"}
+        end
+
+      true ->
+        case Integer.parse(cleaned) do
+          {n, ""} -> {:ok, n}
+          _ -> {:error, "invalid number: #{str}"}
+        end
     end
   end
+
+  defp leading_zero("." <> _ = s), do: "0" <> s
+  defp leading_zero(s), do: s
 
   defp parse_unit(str) do
     case Map.fetch(@units, str) do
