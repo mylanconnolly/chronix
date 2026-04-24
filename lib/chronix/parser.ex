@@ -4,6 +4,7 @@ defmodule Chronix.Parser do
   """
 
   alias Chronix.Duration
+  alias Chronix.Time, as: TimeParser
 
   @type result :: {:ok, DateTime.t()} | {:error, String.t()}
 
@@ -51,6 +52,15 @@ defmodule Chronix.Parser do
   defp do_parse("day before yesterday", opts),
     do: {:ok, DateTime.shift(ref(opts), [{:day, -2}])}
 
+  defp do_parse("noon", opts), do: {:ok, set_time(ref(opts), ~T[12:00:00.000000])}
+  defp do_parse("midnight", opts), do: {:ok, set_time(ref(opts), ~T[00:00:00.000000])}
+
+  defp do_parse("at " <> time_str, opts) do
+    with {:ok, time} <- TimeParser.parse(time_str) do
+      {:ok, set_time(ref(opts), time)}
+    end
+  end
+
   defp do_parse("beginning of " <> rest, opts) do
     with {:ok, duration} <- Duration.parse(rest, opts),
          :ok <- require_integer_boundary(duration) do
@@ -80,11 +90,37 @@ defmodule Chronix.Parser do
         [_, year, month, day] = parts
         parse_ymd(year, month, day, str)
 
+      String.contains?(str, " at ") ->
+        try_combined_at(str, opts)
+
       true ->
+        try_time_or_duration(str, opts)
+    end
+  end
+
+  defp try_combined_at(str, opts) do
+    [date_part, time_part] = String.split(str, " at ", parts: 2)
+
+    with {:ok, time} <- TimeParser.parse(time_part),
+         {:ok, dt} <- do_parse(String.trim(date_part), opts) do
+      {:ok, set_time(dt, time)}
+    end
+  end
+
+  defp try_time_or_duration(str, opts) do
+    case TimeParser.parse(str) do
+      {:ok, time} ->
+        {:ok, set_time(ref(opts), time)}
+
+      {:error, _} ->
         with {:ok, duration} <- Duration.parse(str, opts) do
           {:ok, apply_shift(ref(opts), duration)}
         end
     end
+  end
+
+  defp set_time(dt, %Time{hour: h, minute: m, second: s, microsecond: us}) do
+    %{dt | hour: h, minute: m, second: s, microsecond: us}
   end
 
   defp apply_shift(dt, {:microsecond, n}), do: DateTime.add(dt, n, :microsecond)

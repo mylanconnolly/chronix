@@ -144,6 +144,26 @@ defmodule ChronixTest do
       assert Chronix.expression?("a day")
     end
 
+    test "identifies time-of-day expressions" do
+      assert Chronix.expression?("noon")
+      assert Chronix.expression?("midnight")
+      assert Chronix.expression?("3pm")
+      assert Chronix.expression?("3:15pm")
+      assert Chronix.expression?("15:30")
+      assert Chronix.expression?("at 3pm")
+      refute Chronix.expression?("25:00")
+      refute Chronix.expression?("13pm")
+    end
+
+    test "identifies combined date+time expressions" do
+      assert Chronix.expression?("tomorrow at 3pm")
+      assert Chronix.expression?("next monday at noon")
+      assert Chronix.expression?("yesterday at 9:30am")
+      assert Chronix.expression?("2024-12-25 at 3pm")
+      assert Chronix.expression?("in 3 days at 8am")
+      refute Chronix.expression?("tomorrow at nothing")
+    end
+
     test "identifies fractional durations" do
       assert Chronix.expression?("in 1.5 hours")
       assert Chronix.expression?("0.5 days ago")

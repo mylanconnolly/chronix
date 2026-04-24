@@ -123,6 +123,73 @@ defmodule Chronix.ParserTest do
                {:error, "fractional years are not supported"}
     end
 
+    test "parses bare time-of-day against the reference date" do
+      ref = ~U[2025-01-27 10:30:45.000000Z]
+
+      assert Parser.parse_expression("3pm", reference_date: ref) ==
+               {:ok, ~U[2025-01-27 15:00:00.000000Z]}
+
+      assert Parser.parse_expression("9:15am", reference_date: ref) ==
+               {:ok, ~U[2025-01-27 09:15:00.000000Z]}
+
+      assert Parser.parse_expression("noon", reference_date: ref) ==
+               {:ok, ~U[2025-01-27 12:00:00.000000Z]}
+
+      assert Parser.parse_expression("midnight", reference_date: ref) ==
+               {:ok, ~U[2025-01-27 00:00:00.000000Z]}
+
+      assert Parser.parse_expression("15:30", reference_date: ref) ==
+               {:ok, ~U[2025-01-27 15:30:00.000000Z]}
+    end
+
+    test "parses 'at <time>' as today at that time" do
+      ref = ~U[2025-01-27 10:30:45.000000Z]
+
+      assert Parser.parse_expression("at 3pm", reference_date: ref) ==
+               {:ok, ~U[2025-01-27 15:00:00.000000Z]}
+
+      assert Parser.parse_expression("at noon", reference_date: ref) ==
+               {:ok, ~U[2025-01-27 12:00:00.000000Z]}
+    end
+
+    test "parses '<date> at <time>' combinations" do
+      ref = ~U[2025-01-27 10:30:45.000000Z]
+
+      assert Parser.parse_expression("today at 3pm", reference_date: ref) ==
+               {:ok, ~U[2025-01-27 15:00:00.000000Z]}
+
+      assert Parser.parse_expression("tomorrow at 3pm", reference_date: ref) ==
+               {:ok, ~U[2025-01-28 15:00:00.000000Z]}
+
+      assert Parser.parse_expression("yesterday at noon", reference_date: ref) ==
+               {:ok, ~U[2025-01-26 12:00:00.000000Z]}
+
+      assert Parser.parse_expression("next monday at 9am", reference_date: ref) ==
+               {:ok, ~U[2025-02-03 09:00:00.000000Z]}
+
+      assert Parser.parse_expression("last friday at 5:30pm", reference_date: ref) ==
+               {:ok, ~U[2025-01-24 17:30:00.000000Z]}
+
+      assert Parser.parse_expression("in 3 days at 8am", reference_date: ref) ==
+               {:ok, ~U[2025-01-30 08:00:00.000000Z]}
+
+      assert Parser.parse_expression("2024-12-25 at 3pm") ==
+               {:ok, ~U[2024-12-25 15:00:00.000000Z]}
+
+      assert Parser.parse_expression("12/25/2024 at midnight") ==
+               {:ok, ~U[2024-12-25 00:00:00.000000Z]}
+    end
+
+    test "reports error if the time portion is invalid" do
+      assert {:error, _} = Parser.parse_expression("tomorrow at not-a-time")
+      assert {:error, _} = Parser.parse_expression("tomorrow at 25:00")
+    end
+
+    test "reports error if the date portion is invalid" do
+      assert {:error, _} = Parser.parse_expression("nonsense at 3pm")
+      assert {:error, _} = Parser.parse_expression("2024-13-01 at noon")
+    end
+
     test "parses 'a' / 'an' as a count of 1" do
       ref = ~U[2025-01-27 00:00:00Z]
 
