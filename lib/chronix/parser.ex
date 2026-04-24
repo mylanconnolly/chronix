@@ -55,23 +55,23 @@ defmodule Chronix.Parser do
     end
   end
 
-  defp do_parse(
-         <<month::binary-size(2), "/", day::binary-size(2), "/", year::binary-size(4)>> = str,
-         _opts
-       ) do
-    parse_ymd(year, month, day, str)
-  end
-
-  defp do_parse(
-         <<year::binary-size(4), "-", month::binary-size(2), "-", day::binary-size(2)>> = str,
-         _opts
-       ) do
-    parse_ymd(year, month, day, str)
-  end
+  @slash_date ~r/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/
+  @dash_date ~r/^(\d{4})-(\d{1,2})-(\d{1,2})$/
 
   defp do_parse(str, opts) do
-    with {:ok, duration} <- Duration.parse(str, opts) do
-      {:ok, apply_shift(ref(opts), duration)}
+    cond do
+      parts = Regex.run(@slash_date, str) ->
+        [_, month, day, year] = parts
+        parse_ymd(year, month, day, str)
+
+      parts = Regex.run(@dash_date, str) ->
+        [_, year, month, day] = parts
+        parse_ymd(year, month, day, str)
+
+      true ->
+        with {:ok, duration} <- Duration.parse(str, opts) do
+          {:ok, apply_shift(ref(opts), duration)}
+        end
     end
   end
 

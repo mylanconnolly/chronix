@@ -111,7 +111,7 @@ iex> Chronix.parse("end of 1 year from now", reference_date: reference)
 - Weekday: `"next monday"`, `"last friday"`, etc.
 - Period: `"next week" | "next month" | "next year"` (and `"last ..."`)
 - Boundaries: `"beginning of ..."`, `"end of ..."` applied to any of the above
-- Explicit dates: `mm/dd/yyyy` and `yyyy-mm-dd` (midnight UTC)
+- Explicit dates: `mm/dd/yyyy` and `yyyy-mm-dd` (midnight UTC). Month and day components may be unpadded (`"1/5/2024"`, `"2024-1-5"`); year must be four digits.
 
 Supported units: `second`, `minute`, `hour`, `day`, `week`, `month`, `year` (each also accepts the plural).
 

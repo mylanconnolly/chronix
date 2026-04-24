@@ -118,6 +118,8 @@ defmodule ChronixTest do
     test "identifies explicit-date formats" do
       assert Chronix.expression?("2023-01-01")
       assert Chronix.expression?("01/01/2023")
+      assert Chronix.expression?("1/5/2024")
+      assert Chronix.expression?("2024-1-5")
     end
 
     test "identifies tomorrow and yesterday" do

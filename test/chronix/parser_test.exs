@@ -169,6 +169,21 @@ defmodule Chronix.ParserTest do
       assert Parser.parse_expression("02/30/2024") == {:error, "invalid date: 02/30/2024"}
     end
 
+    test "accepts unpadded mm/dd/yyyy components" do
+      assert Parser.parse_expression("1/5/2024") == {:ok, ~U[2024-01-05 00:00:00Z]}
+      assert Parser.parse_expression("1/15/2024") == {:ok, ~U[2024-01-15 00:00:00Z]}
+      assert Parser.parse_expression("12/5/2024") == {:ok, ~U[2024-12-05 00:00:00Z]}
+    end
+
+    test "rejects slash dates with stray chars or bad widths" do
+      # Two-digit year not supported
+      assert {:error, _} = Parser.parse_expression("1/5/24")
+      # Three-digit month
+      assert {:error, _} = Parser.parse_expression("001/05/2024")
+      # Trailing garbage
+      assert {:error, _} = Parser.parse_expression("1/5/2024abc")
+    end
+
     test "parses yyyy-mm-dd format as UTC DateTime at midnight" do
       assert Parser.parse_expression("2024-12-25") == {:ok, ~U[2024-12-25 00:00:00Z]}
       assert Parser.parse_expression("2025-01-01") == {:ok, ~U[2025-01-01 00:00:00Z]}
@@ -176,6 +191,12 @@ defmodule Chronix.ParserTest do
       assert Parser.parse_expression("2024-13-01") == {:error, "invalid date: 2024-13-01"}
       assert Parser.parse_expression("2024-01-32") == {:error, "invalid date: 2024-01-32"}
       assert Parser.parse_expression("2024-02-30") == {:error, "invalid date: 2024-02-30"}
+    end
+
+    test "accepts unpadded yyyy-mm-dd components" do
+      assert Parser.parse_expression("2024-1-5") == {:ok, ~U[2024-01-05 00:00:00Z]}
+      assert Parser.parse_expression("2024-1-15") == {:ok, ~U[2024-01-15 00:00:00Z]}
+      assert Parser.parse_expression("2024-12-5") == {:ok, ~U[2024-12-05 00:00:00Z]}
     end
 
     test "returns error for empty or blank input" do
