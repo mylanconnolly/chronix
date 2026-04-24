@@ -56,6 +56,79 @@ defmodule Chronix.Grammar do
     ascii_string([?0..?9, ?,, ?.], min: 1)
     |> post_traverse({__MODULE__, :parse_number_string, []})
 
+  # Single-word numbers: teens, tens, and ones. Ordered longest-prefix-first
+  # within each starting letter so shorter alternatives don't steal the match
+  # (e.g. "seventeen" before "seventy" before "seven").
+  single_word_number =
+    choice([
+      replace(string("seventeen"), 17),
+      replace(string("fourteen"), 14),
+      replace(string("thirteen"), 13),
+      replace(string("eighteen"), 18),
+      replace(string("nineteen"), 19),
+      replace(string("fifteen"), 15),
+      replace(string("sixteen"), 16),
+      replace(string("seventy"), 70),
+      replace(string("twenty"), 20),
+      replace(string("eighty"), 80),
+      replace(string("ninety"), 90),
+      replace(string("thirty"), 30),
+      replace(string("eleven"), 11),
+      replace(string("twelve"), 12),
+      replace(string("forty"), 40),
+      replace(string("fifty"), 50),
+      replace(string("sixty"), 60),
+      replace(string("three"), 3),
+      replace(string("seven"), 7),
+      replace(string("eight"), 8),
+      replace(string("four"), 4),
+      replace(string("five"), 5),
+      replace(string("nine"), 9),
+      replace(string("zero"), 0),
+      replace(string("one"), 1),
+      replace(string("two"), 2),
+      replace(string("six"), 6),
+      replace(string("ten"), 10)
+    ])
+    |> concat(word_end)
+
+  tens_word =
+    choice([
+      replace(string("seventy"), 70),
+      replace(string("twenty"), 20),
+      replace(string("eighty"), 80),
+      replace(string("ninety"), 90),
+      replace(string("thirty"), 30),
+      replace(string("forty"), 40),
+      replace(string("fifty"), 50),
+      replace(string("sixty"), 60)
+    ])
+    |> concat(word_end)
+
+  singles_word =
+    choice([
+      replace(string("three"), 3),
+      replace(string("seven"), 7),
+      replace(string("eight"), 8),
+      replace(string("four"), 4),
+      replace(string("five"), 5),
+      replace(string("nine"), 9),
+      replace(string("one"), 1),
+      replace(string("two"), 2),
+      replace(string("six"), 6)
+    ])
+    |> concat(word_end)
+
+  # "twenty one" or "twenty-one" → 21
+  compound_word_number =
+    tens_word
+    |> ignore(choice([ascii_string([?\s], min: 1), string("-")]))
+    |> concat(singles_word)
+    |> post_traverse({__MODULE__, :sum_compound_number, []})
+
+  # Compound first so "twenty one" doesn't stop at "twenty".
+  word_number = choice([compound_word_number, single_word_number])
+
   unknown_number =
     ascii_string([?a..?z], min: 1)
     |> unwrap_and_tag(:unknown_number)
@@ -63,6 +136,7 @@ defmodule Chronix.Grammar do
   number =
     choice([
       number_string,
+      word_number,
       replace(string("an"), 1) |> concat(word_end),
       replace(string("a"), 1) |> concat(word_end),
       unknown_number
@@ -357,6 +431,90 @@ defmodule Chronix.Grammar do
     |> concat(time_combinator)
     |> tag(:at_time)
 
+  # ── Month names ───────────────────────────────────────────────────────
+  # Ordered by length descending so longer names match before their
+  # 3-letter abbreviations (january before jan, etc.). "may" is both the
+  # full name and the abbreviation, listed once.
+  month_name =
+    choice([
+      replace(string("september"), 9),
+      replace(string("february"), 2),
+      replace(string("december"), 12),
+      replace(string("november"), 11),
+      replace(string("january"), 1),
+      replace(string("october"), 10),
+      replace(string("august"), 8),
+      replace(string("march"), 3),
+      replace(string("april"), 4),
+      replace(string("july"), 7),
+      replace(string("june"), 6),
+      replace(string("may"), 5),
+      replace(string("jan"), 1),
+      replace(string("feb"), 2),
+      replace(string("mar"), 3),
+      replace(string("apr"), 4),
+      replace(string("jun"), 6),
+      replace(string("jul"), 7),
+      replace(string("aug"), 8),
+      replace(string("sep"), 9),
+      replace(string("oct"), 10),
+      replace(string("nov"), 11),
+      replace(string("dec"), 12)
+    ])
+    |> concat(word_end)
+
+  # ── Ordinals ──────────────────────────────────────────────────────────
+  ordinal_suffix =
+    choice([
+      string("st"),
+      string("nd"),
+      string("rd"),
+      string("th")
+    ])
+    |> concat(word_end)
+
+  ordinal_day =
+    integer(min: 1, max: 2)
+    |> ignore(optional(ordinal_suffix))
+
+  # Date separator: comma (with optional following space) or whitespace.
+  date_sep =
+    choice([
+      ignore(string(",")) |> concat(ws),
+      ws1
+    ])
+
+  # ── Word date forms ───────────────────────────────────────────────────
+  # "January 1", "January 1 2025", "January 1, 2025", "Jan 1st 2025"
+  month_first_word_date =
+    month_name
+    |> concat(ws1)
+    |> concat(ordinal_day)
+    |> optional(concat(date_sep, integer(4)))
+    |> tag(:word_date_month_first)
+
+  # "1 January", "1 Jan 2025", "1st Jan, 2025"
+  day_first_word_date =
+    ordinal_day
+    |> concat(ws1)
+    |> concat(month_name)
+    |> optional(concat(date_sep, integer(4)))
+    |> tag(:word_date_day_first)
+
+  # "the 1st of January", "the 1st of January 2025"
+  ordinal_of_month =
+    ignore(string("the"))
+    |> concat(ws1)
+    |> concat(ordinal_day)
+    |> concat(ws1)
+    |> ignore(string("of"))
+    |> concat(ws1)
+    |> concat(month_name)
+    |> optional(concat(date_sep, integer(4)))
+    |> tag(:word_date_day_first)
+
+  word_date = choice([month_first_word_date, day_first_word_date, ordinal_of_month])
+
   # ── Explicit date forms ───────────────────────────────────────────────
   year_first_dash =
     integer(4)
@@ -426,6 +584,7 @@ defmodule Chronix.Grammar do
       literal_now,
       at_time_prefix,
       date_form,
+      word_date,
       duration_combinator,
       time_combinator
     ])
@@ -461,4 +620,9 @@ defmodule Chronix.Grammar do
 
   defp ensure_leading_zero("." <> _ = s), do: "0" <> s
   defp ensure_leading_zero(s), do: s
+
+  @doc false
+  def sum_compound_number(rest, [singles, tens], context, _line, _offset) do
+    {rest, [tens + singles], context}
+  end
 end

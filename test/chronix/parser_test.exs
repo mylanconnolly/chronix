@@ -389,6 +389,68 @@ defmodule Chronix.ParserTest do
       assert reason =~ "invalid :endian"
     end
 
+    test "parses month-first word dates" do
+      ref = ~U[2025-06-15 12:00:00Z]
+
+      assert Parser.parse_expression("January 1, 2025", reference_date: ref) ==
+               {:ok, ~U[2025-01-01 00:00:00Z]}
+
+      assert Parser.parse_expression("January 1st, 2025", reference_date: ref) ==
+               {:ok, ~U[2025-01-01 00:00:00Z]}
+
+      assert Parser.parse_expression("Jan 1 2025", reference_date: ref) ==
+               {:ok, ~U[2025-01-01 00:00:00Z]}
+
+      assert Parser.parse_expression("December 31st, 2024", reference_date: ref) ==
+               {:ok, ~U[2024-12-31 00:00:00Z]}
+    end
+
+    test "month-first without year defaults to reference year" do
+      ref = ~U[2025-06-15 12:00:00Z]
+
+      assert Parser.parse_expression("Jan 1", reference_date: ref) ==
+               {:ok, ~U[2025-01-01 00:00:00Z]}
+
+      assert Parser.parse_expression("March 15", reference_date: ref) ==
+               {:ok, ~U[2025-03-15 00:00:00Z]}
+    end
+
+    test "parses day-first word dates" do
+      ref = ~U[2025-06-15 12:00:00Z]
+
+      assert Parser.parse_expression("1 Jan 2025", reference_date: ref) ==
+               {:ok, ~U[2025-01-01 00:00:00Z]}
+
+      assert Parser.parse_expression("1st Jan, 2025", reference_date: ref) ==
+               {:ok, ~U[2025-01-01 00:00:00Z]}
+
+      assert Parser.parse_expression("15 March", reference_date: ref) ==
+               {:ok, ~U[2025-03-15 00:00:00Z]}
+    end
+
+    test "parses 'the Nth of <month>' form" do
+      ref = ~U[2025-06-15 12:00:00Z]
+
+      assert Parser.parse_expression("the 1st of January", reference_date: ref) ==
+               {:ok, ~U[2025-01-01 00:00:00Z]}
+
+      assert Parser.parse_expression("the 15th of March 2024", reference_date: ref) ==
+               {:ok, ~U[2024-03-15 00:00:00Z]}
+    end
+
+    test "word dates validate the calendar" do
+      assert Parser.parse_expression("Jan 32 2025") == {:error, "invalid date: jan 32 2025"}
+      assert Parser.parse_expression("Feb 30 2024") == {:error, "invalid date: feb 30 2024"}
+    end
+
+    test "word dates compose with 'at <time>'" do
+      assert Parser.parse_expression("January 1, 2025 at 3pm") ==
+               {:ok, ~U[2025-01-01 15:00:00.000000Z]}
+
+      assert Parser.parse_expression("the 15th of March 2024 at noon") ==
+               {:ok, ~U[2024-03-15 12:00:00.000000Z]}
+    end
+
     test "accepts unpadded yyyy-mm-dd components" do
       assert Parser.parse_expression("2024-1-5") == {:ok, ~U[2024-01-05 00:00:00Z]}
       assert Parser.parse_expression("2024-1-15") == {:ok, ~U[2024-01-15 00:00:00Z]}

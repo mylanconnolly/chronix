@@ -72,6 +72,19 @@ defmodule Chronix.Evaluator do
     end
   end
 
+  # Word dates — year optional (defaults to reference date's year)
+  def resolve({:word_date_month_first, [month, day]}, opts),
+    do: build_date(ref(opts).year, month, day)
+
+  def resolve({:word_date_month_first, [month, day, year]}, _opts),
+    do: build_date(year, month, day)
+
+  def resolve({:word_date_day_first, [day, month]}, opts),
+    do: build_date(ref(opts).year, month, day)
+
+  def resolve({:word_date_day_first, [day, month, year]}, _opts),
+    do: build_date(year, month, day)
+
   # ── Boundaries ────────────────────────────────────────────────────────
 
   def resolve({:beginning_of, [duration_ast]}, opts) do

@@ -125,6 +125,19 @@ defmodule Chronix.DurationTest do
       assert Duration.parse("1,000 seconds from now") == {:ok, {:second, 1000}}
     end
 
+    test "parses numeric words" do
+      assert Duration.parse("in one day") == {:ok, {:day, 1}}
+      assert Duration.parse("five days ago") == {:ok, {:day, -5}}
+      assert Duration.parse("in twelve hours") == {:ok, {:hour, 12}}
+      assert Duration.parse("twenty years from now") == {:ok, {:year, 20}}
+      assert Duration.parse("in ninety nine years") == {:ok, {:year, 99}}
+      assert Duration.parse("thirty-five minutes ago") == {:ok, {:minute, -35}}
+      assert Duration.parse("in zero seconds") == {:ok, {:second, 0}}
+
+      # Case-insensitive via the façade
+      assert Duration.parse("IN FIVE DAYS") == {:ok, {:day, 5}}
+    end
+
     test "treats 'a' and 'an' as 1" do
       assert Duration.parse("in a week") == {:ok, {:week, 1}}
       assert Duration.parse("in an hour") == {:ok, {:hour, 1}}

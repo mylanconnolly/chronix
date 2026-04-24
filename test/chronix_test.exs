@@ -192,6 +192,24 @@ defmodule ChronixTest do
       refute Chronix.expression?("tomorrow at nothing")
     end
 
+    test "identifies numeric-word durations" do
+      assert Chronix.expression?("in five days")
+      assert Chronix.expression?("twenty years ago")
+      assert Chronix.expression?("in twenty one hours")
+      assert Chronix.expression?("thirty-five minutes from now")
+    end
+
+    test "identifies word-date expressions" do
+      assert Chronix.expression?("January 1, 2025")
+      assert Chronix.expression?("Jan 1 2025")
+      assert Chronix.expression?("1 Jan 2025")
+      assert Chronix.expression?("the 1st of January")
+      assert Chronix.expression?("December 31st, 2024")
+      assert Chronix.expression?("March 15")
+      refute Chronix.expression?("Jan 32 2025")
+      refute Chronix.expression?("Notamonth 1 2025")
+    end
+
     test "identifies fractional durations" do
       assert Chronix.expression?("in 1.5 hours")
       assert Chronix.expression?("0.5 days ago")
@@ -208,7 +226,6 @@ defmodule ChronixTest do
       refute Chronix.expression?("ago")
       refute Chronix.expression?("beginning")
       refute Chronix.expression?("beginning of")
-      refute Chronix.expression?("January 1st, 2023")
       refute Chronix.expression?("random text")
       refute Chronix.expression?("")
       refute Chronix.expression?("    ")
