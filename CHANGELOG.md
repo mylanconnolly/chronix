@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-07-28
+
+### Added
+
+- `Chronix.parse_range/2` — resolves an expression to the inclusive
+  `{start, finish}` interval it denotes, returning
+  `{:ok, {DateTime.t(), DateTime.t()}} | {:error, reason}`. Accepts the
+  same expressions and options (`:reference_date`, `:endian`) as
+  `parse/2`. `finish` is the last microsecond of the period, matching
+  the existing `"end of ..."` semantics. Expressions expand by shape:
+  - Calendar periods (`last/this/next week|month|year`) cover the full
+    calendar period (ISO weeks, Monday–Sunday). As a range, `this week`
+    covers the whole current week even though `parse/2` resolves it to
+    the bare reference date.
+  - Day-granularity expressions (`today`, `tomorrow`, explicit and word
+    dates, weekday expressions, whole-number shifts in day-or-coarser
+    units like `3 days ago` / `in 2 weeks`) cover the whole day.
+  - Instants (`now`, times-of-day, sub-day or fractional shifts,
+    `<date> at <time>`, ISO-8601 timestamps, `beginning of`/`end of`)
+    are zero-width ranges `{instant, instant}`.
+- `Chronix.parse_range!/2` — same, but returns the tuple directly and
+  raises `ArgumentError` on failure.
+
+### Changed
+
+- `"today"` now parses to its own AST node (`{:day_offset, 0}`) instead
+  of sharing `:now` with `"now"`. `parse/2` results are unchanged; the
+  distinction lets `parse_range/2` treat `"today"` as a whole day and
+  `"now"` as an instant.
+
 ## [0.1.0] - 2026-04-24
 
 Initial release. Natural-language date parser for Elixir, inspired by Ruby's
@@ -49,4 +79,5 @@ Initial release. Natural-language date parser for Elixir, inspired by Ruby's
   `0.5 days ago`) converted internally to microseconds; fractional months and
   years are rejected.
 
+[0.2.0]: https://github.com/mylanconnolly/chronix/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/mylanconnolly/chronix/releases/tag/v0.1.0

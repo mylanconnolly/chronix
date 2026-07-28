@@ -16,10 +16,12 @@ end
 
 ## Usage
 
-The main entry points are `Chronix.parse/2`, `Chronix.parse!/2`, and `Chronix.expression?/1`. All three share the same definition of "a valid Chronix expression."
+The main entry points are `Chronix.parse/2`, `Chronix.parse!/2`, `Chronix.parse_range/2`, `Chronix.parse_range!/2`, and `Chronix.expression?/1`. All of them share the same definition of "a valid Chronix expression."
 
 - `parse/2` returns `{:ok, %DateTime{}}` on success or `{:error, reason}` on failure. It never raises.
 - `parse!/2` returns the `DateTime` directly and raises `ArgumentError` on failure.
+- `parse_range/2` returns `{:ok, {start, finish}}` — the inclusive interval the expression denotes (see [Ranges](#ranges)).
+- `parse_range!/2` returns the `{start, finish}` tuple directly and raises `ArgumentError` on failure.
 - `expression?/1` returns `true` if and only if `parse/2` would succeed on the same input.
 
 ```elixir
@@ -101,6 +103,38 @@ iex> Chronix.parse("beginning of 1 year from now", reference_date: reference)
 iex> Chronix.parse("end of 1 year from now", reference_date: reference)
 {:ok, ~U[2026-12-31 23:59:59.999999Z]}  # End of next year
 ```
+
+## Ranges
+
+`Chronix.parse_range/2` resolves an expression to the inclusive `{start, finish}` interval it denotes. It accepts exactly the same expressions and options as `parse/2`; the `finish` bound is the last microsecond of the period, matching the `"end of ..."` semantics above.
+
+- **Calendar periods** (`last/this/next week|month|year`) expand to the full calendar bounds of that period. ISO weeks run Monday through Sunday. Note that `"this week"` as a *range* covers the whole current week, even though `parse/2` resolves it to the bare reference date.
+- **Day-granularity expressions** — `today`, `yesterday`, `tomorrow`, explicit and word dates, weekday expressions (`next monday`), and relative shifts in whole day-or-coarser units (`3 days ago`, `in 2 weeks`) — expand to the whole day: 00:00:00.000000 to 23:59:59.999999.
+- **Instants** — anything carrying a time-of-day or resolving to a point (`now`, `noon`, `2 hours ago`, `tomorrow at 3pm`, ISO-8601 timestamps, `beginning of ...`/`end of ...`, fractional durations like `1.5 days ago`) — become zero-width ranges `{instant, instant}`.
+
+```elixir
+iex> ref = ~U[2025-01-15 10:30:45Z]  # a Wednesday
+
+iex> Chronix.parse_range("last week", reference_date: ref)
+{:ok, {~U[2025-01-06 00:00:00.000000Z], ~U[2025-01-12 23:59:59.999999Z]}}
+
+iex> Chronix.parse_range("this month", reference_date: ref)
+{:ok, {~U[2025-01-01 00:00:00.000000Z], ~U[2025-01-31 23:59:59.999999Z]}}
+
+iex> Chronix.parse_range("today", reference_date: ref)
+{:ok, {~U[2025-01-15 00:00:00.000000Z], ~U[2025-01-15 23:59:59.999999Z]}}
+
+iex> Chronix.parse_range("7/1/2026", reference_date: ref)
+{:ok, {~U[2026-07-01 00:00:00.000000Z], ~U[2026-07-01 23:59:59.999999Z]}}
+
+iex> Chronix.parse_range("3 hours ago", reference_date: ref)
+{:ok, {~U[2025-01-15 07:30:45Z], ~U[2025-01-15 07:30:45Z]}}
+
+iex> Chronix.parse_range!("tomorrow at 3pm", reference_date: ref)
+{~U[2025-01-16 15:00:00.000000Z], ~U[2025-01-16 15:00:00.000000Z]}
+```
+
+`last/this/next quarter` is not supported (quarters exist only as a duration unit — `"in 2 quarters"` — not as a calendar period). All arithmetic happens in whatever time zone the reference date carries; normalize zones before calling if you need a specific one.
 
 ## Supported formats
 

@@ -33,6 +33,7 @@ defmodule Chronix.Evaluator do
   # ── Reference-date literals ───────────────────────────────────────────
 
   def resolve(:now, opts), do: {:ok, ref(opts)}
+  def resolve({:day_offset, 0}, opts), do: {:ok, ref(opts)}
   def resolve({:day_offset, n}, opts), do: {:ok, DateTime.shift(ref(opts), [{:day, n}])}
   def resolve({:this_period, _period}, opts), do: {:ok, ref(opts)}
 
@@ -168,44 +169,48 @@ defmodule Chronix.Evaluator do
   defp require_integer_boundary(_), do: :ok
 
   # ── Boundary truncation ───────────────────────────────────────────────
+  # Public (but undocumented) so `Chronix.Range` can reuse the exact same
+  # boundary semantics when expanding expressions into intervals.
 
-  defp beginning_of(dt, {:second, _}), do: %{dt | microsecond: {0, 6}}
-  defp beginning_of(dt, {:minute, _}), do: %{dt | second: 0, microsecond: {0, 6}}
-  defp beginning_of(dt, {:hour, _}), do: %{dt | minute: 0, second: 0, microsecond: {0, 6}}
+  @doc false
+  def beginning_of(dt, {:second, _}), do: %{dt | microsecond: {0, 6}}
+  def beginning_of(dt, {:minute, _}), do: %{dt | second: 0, microsecond: {0, 6}}
+  def beginning_of(dt, {:hour, _}), do: %{dt | minute: 0, second: 0, microsecond: {0, 6}}
 
-  defp beginning_of(dt, {:day, _}),
+  def beginning_of(dt, {:day, _}),
     do: %{dt | hour: 0, minute: 0, second: 0, microsecond: {0, 6}}
 
-  defp beginning_of(dt, {:week, _}) do
+  def beginning_of(dt, {:week, _}) do
     dt
     |> DateTime.add(-((Date.day_of_week(dt) - 1) * 86_400), :second)
     |> then(&%{&1 | hour: 0, minute: 0, second: 0, microsecond: {0, 6}})
   end
 
-  defp beginning_of(dt, {:month, _}),
+  def beginning_of(dt, {:month, _}),
     do: %{dt | day: 1, hour: 0, minute: 0, second: 0, microsecond: {0, 6}}
 
-  defp beginning_of(dt, {:year, _}),
+  def beginning_of(dt, {:year, _}),
     do: %{dt | month: 1, day: 1, hour: 0, minute: 0, second: 0, microsecond: {0, 6}}
 
-  defp end_of(dt, {:second, _}), do: %{dt | microsecond: {999_999, 6}}
-  defp end_of(dt, {:minute, _}), do: %{dt | second: 59, microsecond: {999_999, 6}}
-  defp end_of(dt, {:hour, _}), do: %{dt | minute: 59, second: 59, microsecond: {999_999, 6}}
+  @doc false
+  def end_of(dt, {:second, _}), do: %{dt | microsecond: {999_999, 6}}
+  def end_of(dt, {:minute, _}), do: %{dt | second: 59, microsecond: {999_999, 6}}
+  def end_of(dt, {:hour, _}), do: %{dt | minute: 59, second: 59, microsecond: {999_999, 6}}
 
-  defp end_of(dt, {:day, _}),
+  def end_of(dt, {:day, _}),
     do: %{dt | hour: 23, minute: 59, second: 59, microsecond: {999_999, 6}}
 
-  defp end_of(dt, {:week, _}) do
+  def end_of(dt, {:week, _}) do
     dt
     |> DateTime.add((7 - Date.day_of_week(dt)) * 86_400, :second)
     |> then(&%{&1 | hour: 23, minute: 59, second: 59, microsecond: {999_999, 6}})
   end
 
-  defp end_of(dt, {:month, _}) do
+  def end_of(dt, {:month, _}) do
     days_in_month = Calendar.ISO.days_in_month(dt.year, dt.month)
     %{dt | day: days_in_month, hour: 23, minute: 59, second: 59, microsecond: {999_999, 6}}
   end
 
-  defp end_of(dt, {:year, _}),
+  def end_of(dt, {:year, _}),
     do: %{dt | month: 12, day: 31, hour: 23, minute: 59, second: 59, microsecond: {999_999, 6}}
 end

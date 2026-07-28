@@ -29,8 +29,8 @@ defmodule Chronix.Grammar do
   - Inside shifts, unknown numbers/units: `{:unknown_number, str}`, `{:unknown_unit, str}`
 
   Expression (`:expression`):
-  - `:now` — today/now
-  - `{:day_offset, n}` — tomorrow/yesterday/day-after/day-before
+  - `:now` — now
+  - `{:day_offset, n}` — today (0)/tomorrow/yesterday/day-after/day-before
   - `{:this_period, :week | :month | :year}`
   - `:tonight`, `:last_night`
   - `{:this_tod, %Time{}}`, `{:tomorrow_tod, %Time{}}`, `{:yesterday_tod, %Time{}}`
@@ -339,8 +339,16 @@ defmodule Chronix.Grammar do
 
   # ── Expression-level literals ─────────────────────────────────────────
   literal_now =
-    choice([string("today"), string("now")])
+    string("now")
     |> replace(:now)
+    |> concat(word_end)
+
+  # "today" gets its own AST node (a zero day-offset) so range resolution
+  # can treat it as a whole day while "now" stays an instant. Through
+  # `Chronix.Evaluator.resolve/2` both still yield the reference date.
+  literal_today =
+    string("today")
+    |> replace({:day_offset, 0})
     |> concat(word_end)
 
   literal_tomorrow =
@@ -581,6 +589,7 @@ defmodule Chronix.Grammar do
       literal_day_before_yesterday,
       literal_tomorrow,
       literal_yesterday,
+      literal_today,
       literal_now,
       at_time_prefix,
       date_form,
